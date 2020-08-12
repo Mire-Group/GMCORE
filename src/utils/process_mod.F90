@@ -347,7 +347,7 @@ contains
 
   subroutine process_create_blocks()
 
-    integer ingb
+    integer ingb, data_type
 
     if (.not. allocated(proc%blocks)) allocate(proc%blocks(1))
 
@@ -357,8 +357,14 @@ contains
     ! Setup halos (only normal halos for the time being).
     allocate(proc%blocks(1)%halo(size(proc%ngb)))
     do ingb = 1, size(proc%ngb)
-      call proc%blocks(1)%halo(ingb)%init_normal(proc%blocks(1)%mesh, orient=proc%ngb(ingb)%orient, &
-                                                 ngb_proc_id=proc%ngb(ingb)%id)
+      select case (r8)
+      case (4)
+        data_type = MPI_REAL
+      case (8)
+        data_type = MPI_DOUBLE
+      end select
+      call proc%blocks(1)%halo(ingb)%init_normal(proc%blocks(1)%mesh, proc%ngb(ingb)%orient, &
+                                                 data_type, ngb_proc_id=proc%ngb(ingb)%id)
     end do
 
   end subroutine process_create_blocks

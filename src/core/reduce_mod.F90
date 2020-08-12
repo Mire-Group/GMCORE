@@ -44,7 +44,7 @@ module reduce_mod
 
   interface
     subroutine reduce_sub_interface(j, buf_j, move, block, raw_mesh, raw_state, reduced_mesh, reduced_static, reduced_state, dt)
-      import block_type, mesh_type, state_type, reduced_mesh_type, reduced_static_type, reduced_state_type, r8
+      import block_type, mesh_type, state_type, reduced_mesh_type, reduced_static_type, reduced_state_type
       integer, intent(in) :: j
       integer, intent(in) :: buf_j
       integer, intent(in) :: move
@@ -54,7 +54,7 @@ module reduce_mod
       type(reduced_mesh_type), intent(in) :: reduced_mesh
       type(reduced_static_type), intent(in) :: reduced_static
       type(reduced_state_type), intent(inout) :: reduced_state
-      real(r8), intent(in) :: dt
+      real(8), intent(in) :: dt
     end subroutine reduce_sub_interface
   end interface
 
@@ -114,7 +114,7 @@ contains
 
     type(block_type), intent(inout) :: block
     type(state_type), intent(inout) :: state
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
     integer, intent(in) :: pass
 
     integer j
@@ -373,7 +373,7 @@ contains
     type(reduced_mesh_type), intent(in) :: reduced_mesh
     type(reduced_static_type), intent(in) :: reduced_static
     type(reduced_state_type), intent(inout) :: reduced_state
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
     integer, intent(in) :: pass
 
 #define reduce_args(x, sub) lbound(reduced_state%x, 3), ubound(reduced_state%x, 3), j, block, raw_mesh, raw_state, reduced_mesh, reduced_static, reduced_state, sub, dt
@@ -388,6 +388,7 @@ contains
         call apply_reduce(reduce_args(mf_lat_n   , reduce_mf_lat_n   ))
         call apply_reduce(reduce_args(mf_lon_t   , reduce_mf_lon_t   ))
         call apply_reduce(reduce_args(mf_lat_t   , reduce_mf_lat_t   ))
+      if (pass == all_pass .or. pass == slow_pass) then
         call apply_reduce(reduce_args(m_lon      , reduce_m_lon      ))
         call apply_reduce(reduce_args(m_lat      , reduce_m_lat      ))
         call apply_reduce(reduce_args(u          , reduce_u          ))
@@ -399,6 +400,7 @@ contains
         call apply_reduce(reduce_args(dpv_lon_n  , reduce_dpv_lon_n  ))
         call apply_reduce(reduce_args(pv_lon     , reduce_pv_lon_apvm))
         call apply_reduce(reduce_args(pv_lat     , reduce_pv_lat_apvm))
+      end if
         call apply_reduce(reduce_args(ke         , reduce_ke         ))
         call apply_reduce(reduce_args(ptf_lon    , reduce_ptf_lon    ))
         call apply_reduce(reduce_args(t_lnpop_lon, reduce_t_lnpop_lon))
@@ -468,7 +470,7 @@ contains
     type(reduced_static_type), intent(in) :: reduced_static
     type(reduced_state_type), intent(inout) :: reduced_state
     procedure(reduce_sub_interface) reduce_sub
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
 
     integer buf_j, move
 
@@ -491,7 +493,7 @@ contains
     type(reduced_mesh_type), intent(in) :: reduced_mesh
     type(reduced_static_type), intent(in) :: reduced_static
     type(reduced_state_type), intent(inout) :: reduced_state
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
 
     integer i, k
 
@@ -516,7 +518,7 @@ contains
     type(reduced_mesh_type), intent(in) :: reduced_mesh
     type(reduced_static_type), intent(in) :: reduced_static
     type(reduced_state_type), intent(inout) :: reduced_state
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
 
     integer i, k
 
@@ -541,7 +543,7 @@ contains
     type(reduced_mesh_type), intent(in) :: reduced_mesh
     type(reduced_static_type), intent(in) :: reduced_static
     type(reduced_state_type), intent(inout) :: reduced_state
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
 
     integer i, k, l
     real(r8) dgz
@@ -572,7 +574,7 @@ contains
     type(reduced_mesh_type), intent(in) :: reduced_mesh
     type(reduced_static_type), intent(in) :: reduced_static
     type(reduced_state_type), intent(inout) :: reduced_state
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
 
     integer raw_i, i, k
 
@@ -601,7 +603,7 @@ contains
     type(reduced_mesh_type), intent(in) :: reduced_mesh
     type(reduced_static_type), intent(in) :: reduced_static
     type(reduced_state_type), intent(inout) :: reduced_state
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
 
     integer raw_i, i, k
 
@@ -630,7 +632,7 @@ contains
     type(reduced_mesh_type), intent(in) :: reduced_mesh
     type(reduced_static_type), intent(in) :: reduced_static
     type(reduced_state_type), intent(inout) :: reduced_state
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
 
     real(r8) m_vtx
     integer raw_i, i, k
@@ -707,7 +709,7 @@ contains
     type(reduced_mesh_type), intent(in) :: reduced_mesh
     type(reduced_static_type), intent(in) :: reduced_static
     type(reduced_state_type), intent(inout) :: reduced_state
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
 
     integer i, k
 
@@ -735,7 +737,7 @@ contains
     type(reduced_mesh_type), intent(in) :: reduced_mesh
     type(reduced_static_type), intent(in) :: reduced_static
     type(reduced_state_type), intent(inout) :: reduced_state
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
 
     integer i, k
 
@@ -770,7 +772,7 @@ contains
     type(reduced_mesh_type), intent(in) :: reduced_mesh
     type(reduced_static_type), intent(in) :: reduced_static
     type(reduced_state_type), intent(inout) :: reduced_state
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
 
     integer raw_i, i, k
 
@@ -799,7 +801,7 @@ contains
     type(reduced_mesh_type), intent(in) :: reduced_mesh
     type(reduced_static_type), intent(in) :: reduced_static
     type(reduced_state_type), intent(inout) :: reduced_state
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
 
     integer raw_i, i, k
 
@@ -828,7 +830,7 @@ contains
     type(reduced_mesh_type), intent(in) :: reduced_mesh
     type(reduced_static_type), intent(in) :: reduced_static
     type(reduced_state_type), intent(inout) :: reduced_state
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
 
     integer i, k
 
@@ -859,7 +861,7 @@ contains
     type(reduced_mesh_type), intent(in) :: reduced_mesh
     type(reduced_static_type), intent(in) :: reduced_static
     type(reduced_state_type), intent(inout) :: reduced_state
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
 
     integer i, k
 
@@ -891,7 +893,7 @@ contains
     type(reduced_mesh_type), intent(in) :: reduced_mesh
     type(reduced_static_type), intent(in) :: reduced_static
     type(reduced_state_type), intent(inout) :: reduced_state
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
 
     integer i, k
 
@@ -919,7 +921,7 @@ contains
     type(reduced_mesh_type), intent(in) :: reduced_mesh
     type(reduced_static_type), intent(in) :: reduced_static
     type(reduced_state_type), intent(inout) :: reduced_state
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
 
     integer i, k
 
@@ -943,7 +945,7 @@ contains
     type(reduced_mesh_type), intent(in) :: reduced_mesh
     type(reduced_static_type), intent(in) :: reduced_static
     type(reduced_state_type), intent(inout) :: reduced_state
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
 
     integer i, k
 
@@ -980,7 +982,7 @@ contains
     type(reduced_mesh_type), intent(in) :: reduced_mesh
     type(reduced_static_type), intent(in) :: reduced_static
     type(reduced_state_type), intent(inout) :: reduced_state
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
 
     integer i, k
 
@@ -1017,7 +1019,7 @@ contains
     type(reduced_mesh_type), intent(in) :: reduced_mesh
     type(reduced_static_type), intent(in) :: reduced_static
     type(reduced_state_type), intent(inout) :: reduced_state
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
 
     real(r8) u, v, le, de
     integer i, k
@@ -1064,7 +1066,7 @@ contains
     type(reduced_mesh_type), intent(in) :: reduced_mesh
     type(reduced_static_type), intent(in) :: reduced_static
     type(reduced_state_type), intent(inout) :: reduced_state
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
 
     real(r8) u, v, le, de
     integer i, k
@@ -1101,7 +1103,7 @@ contains
     type(reduced_mesh_type), intent(in) :: reduced_mesh
     type(reduced_static_type), intent(in) :: reduced_static
     type(reduced_state_type), intent(inout) :: reduced_state
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
 
     integer raw_i, i, k
 
@@ -1129,7 +1131,7 @@ contains
     type(reduced_mesh_type), intent(in) :: reduced_mesh
     type(reduced_static_type), intent(in) :: reduced_static
     type(reduced_state_type), intent(inout) :: reduced_state
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
 
     integer raw_i, i, k
 
@@ -1156,7 +1158,7 @@ contains
     type(reduced_mesh_type), intent(in) :: reduced_mesh
     type(reduced_static_type), intent(in) :: reduced_static
     type(reduced_state_type), intent(inout) :: reduced_state
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
 
     integer raw_i, i, k
 
@@ -1192,7 +1194,7 @@ contains
     type(reduced_mesh_type), intent(in) :: reduced_mesh
     type(reduced_static_type), intent(in) :: reduced_static
     type(reduced_state_type), intent(inout) :: reduced_state
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
 
     integer i, k
 
@@ -1216,7 +1218,7 @@ contains
     type(reduced_mesh_type), intent(in) :: reduced_mesh
     type(reduced_static_type), intent(in) :: reduced_static
     type(reduced_state_type), intent(inout) :: reduced_state
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
 
     integer i, k
 
@@ -1246,7 +1248,7 @@ contains
     type(reduced_mesh_type), intent(in) :: reduced_mesh
     type(reduced_static_type), intent(in) :: reduced_static
     type(reduced_state_type), intent(inout) :: reduced_state
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
 
     integer raw_i, i, k
     real(r8), parameter :: ln2 = log(2.0_r8)
@@ -1285,7 +1287,7 @@ contains
     type(reduced_mesh_type), intent(in) :: reduced_mesh
     type(reduced_static_type), intent(in) :: reduced_static
     type(reduced_state_type), intent(inout) :: reduced_state
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
 
     integer raw_i, i, k
 

@@ -27,8 +27,8 @@ module gmcore_mod
 
   interface
     subroutine integrator_interface(dt, block, old, new, pass)
-      import r8, block_type, tend_type, state_type
-      real(r8), intent(in) :: dt
+      import block_type, tend_type, state_type
+      real(8), intent(in) :: dt
       type(block_type), intent(inout) :: block
       integer, intent(in) :: old
       integer, intent(in) :: new
@@ -36,17 +36,15 @@ module gmcore_mod
     end subroutine integrator_interface
 
     subroutine splitter_interface(dt, block)
-      import r8, block_type
-      real(r8), intent(in) :: dt
+      import block_type
+      real(8), intent(in) :: dt
       type(block_type), intent(inout) :: block
     end subroutine splitter_interface
   end interface
 
   procedure(integrator_interface), pointer :: integrator
+  procedure(integrator_interface), pointer :: fast_integrator
   procedure(splitter_interface), pointer :: splitter
-
-  real(r8) :: shrink_ratio = 1
-  real(r8) :: shrink_cound_down = 0
 
 contains
 
@@ -55,7 +53,7 @@ contains
     character(*), intent(in) :: namelist_path
 
     character(10) time_value, time_units
-    real(r8) seconds
+    real(8) seconds
 
     call log_init()
     call global_mesh%init_global(num_lon, num_lat, num_lev, lon_halo_width=max(1, maxval(reduce_factors) - 1), lat_halo_width=2)
@@ -70,8 +68,8 @@ contains
     call damp_init()
 
     select case (time_scheme)
-    case ('debug')
-      integrator => euler_debug
+    case ('euler')
+      integrator => euler
     case ('pc2')
       integrator => predict_correct
     case ('pc2+fb')
@@ -84,6 +82,8 @@ contains
       integrator => predict_correct
       call log_notice('Use pc2 integrator.')
     end select
+
+    fast_integrator => predict_correct
 
     select case (split_scheme)
     case ('csp2')
@@ -121,9 +121,8 @@ contains
 
     do while (.not. time_is_finished())
       call time_integrate(dt_in_seconds, proc%blocks)
-      if (proc%id == 0 .and. time_is_alerted('print')) call log_print_diag(curr_time%isoformat())
+      if (is_root_proc() .and. time_is_alerted('print')) call log_print_diag(curr_time%isoformat())
       call time_advance(dt_in_seconds)
-      call operators_prepare(proc%blocks, old, dt_in_seconds)
       call diagnose(proc%blocks, old)
       call output(proc%blocks, old)
     end do
@@ -144,7 +143,7 @@ contains
     integer, intent(in) :: itime
 
     type(state_type), pointer :: state
-    real(r8), save :: time1 = 0, time2
+    real(8), save :: time1 = 0, time2
     integer i, j, k, iblk
 
     if (time_is_alerted('history_write')) then
@@ -262,9 +261,9 @@ contains
       blocks(iblk)%state(itime)%tpe = tpe
     end do
 
-    call log_add_diag('tm' , tm )
-    call log_add_diag('te' , te )
-    call log_add_diag('tpe', tpe)
+    call log_add_diag('tm' , dble(tm ))
+    call log_add_diag('te' , dble(te ))
+    call log_add_diag('tpe', dble(tpe))
 
   end subroutine diagnose
 
@@ -273,7 +272,7 @@ contains
     type(block_type), intent(inout) :: block
     type(state_type), intent(inout) :: state
     type(tend_type), intent(inout) :: tend
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
     integer, intent(in) :: pass
 
     type(mesh_type), pointer :: mesh
@@ -283,7 +282,7 @@ contains
     call wait_halo(state%async(async_u))
     call wait_halo(state%async(async_v))
 
-    call operators_prepare(block, state, dt)
+    call operators_prepare(block, state, dt, pass)
     call reduce_run(block, state, dt, pass)
 
     mesh => state%mesh
@@ -420,26 +419,18 @@ contains
       end if
     case (slow_pass)
       if (baroclinic .and. hydrostatic) then
-        call calc_voru_vorv        (block, state, tend, dt)
-        call calc_dkedlon_dkedlat  (block, state, tend, dt)
-        call calc_dptfdlon_dptfdlat(block, state, tend, dt)
+        call calc_qhu_qhv          (block, state, tend, dt)
 
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
           do j = mesh%full_lat_ibeg_no_pole, mesh%full_lat_iend_no_pole
             do i = mesh%half_lon_ibeg, mesh%half_lon_iend
-              tend%du(i,j,k) =   tend%vorv(i,j,k) - tend%dkedlon(i,j,k)
+              tend%du(i,j,k) =   tend%qhv(i,j,k)
             end do
           end do
 
           do j = mesh%half_lat_ibeg_no_pole, mesh%half_lat_iend_no_pole
             do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-              tend%dv(i,j,k) = - tend%voru(i,j,k) - tend%dkedlat(i,j,k)
-            end do
-          end do
-
-          do j = mesh%full_lat_ibeg, mesh%full_lat_iend
-            do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-              tend%dpt(i,j,k) = - tend%dptfdlon(i,j,k) - tend%dptfdlat(i,j,k)
+              tend%dv(i,j,k) = - tend%qhu(i,j,k)
             end do
           end do
         end do
@@ -447,9 +438,9 @@ contains
         tend%updated_du   = .true.
         tend%updated_dv   = .true.
         tend%copy_phs     = .true.
-        tend%updated_dpt  = .true.
+        tend%copy_pt      = .true.
       else
-        call calc_qhu_qhv(block, state, tend, dt)
+        call calc_qhu_qhv          (block, state, tend, dt)
 
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
           do j = mesh%full_lat_ibeg_no_pole, mesh%full_lat_iend_no_pole
@@ -476,26 +467,27 @@ contains
         call calc_wedphdlev        (block, state, tend, dt)
         call calc_wedudlev_wedvdlev(block, state, tend, dt)
         call calc_dptfdlev         (block, state, tend, dt)
+        call calc_dptfdlon_dptfdlat(block, state, tend, dt)
+        call calc_dkedlon_dkedlat  (block, state, tend, dt)
         call calc_dpedlon_dpedlat  (block, state, tend, dt)
         call calc_dpdlon_dpdlat    (block, state, tend, dt)
-        call calc_fu_fv            (block, state, tend, dt)
 
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
           do j = mesh%full_lat_ibeg_no_pole, mesh%full_lat_iend_no_pole
             do i = mesh%half_lon_ibeg, mesh%half_lon_iend
-              tend%du(i,j,k) =   tend%fv(i,j,k) - tend%wedudlev(i,j,k) - tend%dpedlon(i,j,k) - tend%dpdlon(i,j,k)
+              tend%du(i,j,k) = - tend%dpedlon(i,j,k) - tend%dpdlon(i,j,k) - tend%dkedlon(i,j,k) - tend%wedudlev(i,j,k)
             end do
           end do
 
           do j = mesh%half_lat_ibeg_no_pole, mesh%half_lat_iend_no_pole
             do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-              tend%dv(i,j,k) = - tend%fu(i,j,k) - tend%wedvdlev(i,j,k) - tend%dpedlat(i,j,k) - tend%dpdlat(i,j,k)
+              tend%dv(i,j,k) = - tend%dpedlat(i,j,k) - tend%dpdlat(i,j,k) - tend%dkedlat(i,j,k) - tend%wedvdlev(i,j,k)
             end do
           end do
 
           do j = mesh%full_lat_ibeg, mesh%full_lat_iend
             do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-              tend%dpt(i,j,k) = - tend%dptfdlev(i,j,k)
+              tend%dpt(i,j,k) = - tend%dptfdlon(i,j,k) - tend%dptfdlat(i,j,k) - tend%dptfdlev(i,j,k)
             end do
           end do
         end do
@@ -533,6 +525,61 @@ contains
         tend%updated_dv  = .true.
         tend%updated_dgz = .true.
       end if
+    case (fast_pass + forward_pass)
+      if (baroclinic .and. hydrostatic) then
+        call calc_dmfdlon_dmfdlat  (block, state, tend, dt)
+        call calc_dphs             (block, state, tend, dt)
+        call calc_wedphdlev        (block, state, tend, dt)
+        call calc_wedudlev_wedvdlev(block, state, tend, dt)
+        call calc_dptfdlev         (block, state, tend, dt)
+        call calc_dptfdlon_dptfdlat(block, state, tend, dt)
+        call calc_dkedlon_dkedlat  (block, state, tend, dt)
+
+        do k = mesh%full_lev_ibeg, mesh%full_lev_iend
+          do j = mesh%full_lat_ibeg_no_pole, mesh%full_lat_iend_no_pole
+            do i = mesh%half_lon_ibeg, mesh%half_lon_iend
+              tend%du(i,j,k) = - tend%dkedlon(i,j,k) - tend%wedudlev(i,j,k)
+            end do
+          end do
+
+          do j = mesh%half_lat_ibeg_no_pole, mesh%half_lat_iend_no_pole
+            do i = mesh%full_lon_ibeg, mesh%full_lon_iend
+              tend%dv(i,j,k) = - tend%dkedlat(i,j,k) - tend%wedvdlev(i,j,k)
+            end do
+          end do
+
+          do j = mesh%full_lat_ibeg, mesh%full_lat_iend
+            do i = mesh%full_lon_ibeg, mesh%full_lon_iend
+              tend%dpt(i,j,k) = - tend%dptfdlon(i,j,k) - tend%dptfdlat(i,j,k) - tend%dptfdlev(i,j,k)
+            end do
+          end do
+        end do
+
+        tend%updated_dpt  = .true.
+        tend%updated_dphs = .true.
+      end if
+    case (fast_pass + backward_pass)
+      if (baroclinic .and. hydrostatic) then
+        call calc_dpedlon_dpedlat  (block, state, tend, dt)
+        call calc_dpdlon_dpdlat    (block, state, tend, dt)
+
+        do k = mesh%full_lev_ibeg, mesh%full_lev_iend
+          do j = mesh%full_lat_ibeg_no_pole, mesh%full_lat_iend_no_pole
+            do i = mesh%half_lon_ibeg, mesh%half_lon_iend
+              tend%du(i,j,k) = tend%du(i,j,k) - tend%dpedlon(i,j,k) - tend%dpdlon(i,j,k)
+            end do
+          end do
+
+          do j = mesh%half_lat_ibeg_no_pole, mesh%half_lat_iend_no_pole
+            do i = mesh%full_lon_ibeg, mesh%full_lon_iend
+              tend%dv(i,j,k) = tend%dv(i,j,k) - tend%dpedlat(i,j,k) - tend%dpdlat(i,j,k)
+            end do
+          end do
+        end do
+
+        tend%updated_du   = .true.
+        tend%updated_dv   = .true.
+      end if
     end select
 
     ! call debug_check_space_operators(block, state, tend)
@@ -541,7 +588,7 @@ contains
 
   subroutine time_integrate(dt, blocks)
 
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
     type(block_type), intent(inout) :: blocks(:)
 
     integer iblk
@@ -554,97 +601,112 @@ contains
 
   subroutine csp2_splitting(dt, block)
 
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
     type(block_type), intent(inout) :: block
 
-    real(r8) fast_dt
+    real(8) fast_dt
     integer subcycle, t1, t2
 
     fast_dt = dt / fast_cycles
     t1 = 3
     t2 = old
 
-    call integrator(0.5_r8 * dt, block, old, t1, slow_pass)
+    call integrator(0.5d0 * dt, block, old, t1, slow_pass)
     do subcycle = 1, fast_cycles
-      call integrator(fast_dt, block, t1, t2, fast_pass)
+      call fast_integrator(fast_dt, block, t1, t2, fast_pass)
       call time_swap_indices(t1, t2)
     end do
-    call integrator(0.5_r8 * dt, block, t1, new, slow_pass)
+    call integrator(0.5d0 * dt, block, t1, new, slow_pass)
 
   end subroutine csp2_splitting
 
   subroutine no_splitting(dt, block)
 
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
     type(block_type), intent(inout) :: block
 
     call integrator(dt, block, old, new, all_pass)
 
   end subroutine no_splitting
 
-  subroutine euler_debug(dt, block, old, new, pass)
+  subroutine euler(dt, block, old, new, pass)
 
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
     type(block_type), intent(inout) :: block
     integer, intent(in) :: old
     integer, intent(in) :: new
     integer, intent(in) :: pass
 
     call space_operators(block, block%state(old), block%tend(old), dt, pass)
-    call update_state(dt, block, block%tend(old), block%state(old), block%state(new))
+    call update_state(dt, block, block%tend(old), block%state(old), block%state(new), pass)
 
-  end subroutine euler_debug
+  end subroutine euler
+
+  subroutine euler_with_forward_backward(dt, block, old, new, pass)
+
+    real(8), intent(in) :: dt
+    type(block_type), intent(inout) :: block
+    integer, intent(in) :: old
+    integer, intent(in) :: new
+    integer, intent(in) :: pass
+
+    call space_operators(block, block%state(old), block%tend(old), dt, pass + forward_pass)
+    call update_state(dt, block, block%tend(old), block%state(old), block%state(new), pass)
+    call space_operators(block, block%state(new), block%tend(old), dt, pass + backward_pass)
+    call update_state(dt, block, block%tend(old), block%state(old), block%state(new), pass)
+
+  end subroutine euler_with_forward_backward
 
   subroutine predict_correct(dt, block, old, new, pass)
 
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
     type(block_type), intent(inout) :: block
     integer, intent(in) :: old
     integer, intent(in) :: new
     integer, intent(in) :: pass
 
     ! Do first predict step.
-    call space_operators(block, block%state(old), block%tend(old), 0.5_r8 * dt, pass)
-    call update_state(0.5_r8 * dt, block, block%tend(old), block%state(old), block%state(new))
+    call space_operators(block, block%state(old), block%tend(old), 0.5d0 * dt, pass)
+    call update_state(0.5d0 * dt, block, block%tend(old), block%state(old), block%state(new), pass)
 
     ! Do second predict step.
-    call space_operators(block, block%state(new), block%tend(old), 0.5_r8 * dt, pass)
-    call update_state(0.5_r8 * dt, block, block%tend(old), block%state(old), block%state(new))
+    call space_operators(block, block%state(new), block%tend(old), 0.5d0 * dt, pass)
+    call update_state(0.5d0 * dt, block, block%tend(old), block%state(old), block%state(new), pass)
 
     ! Do correct step.
-    call space_operators(block, block%state(new), block%tend(new),          dt, pass)
-    call update_state(         dt, block, block%tend(new), block%state(old), block%state(new))
+    call space_operators(block, block%state(new), block%tend(new),         dt, pass)
+    call update_state(        dt, block, block%tend(new), block%state(old), block%state(new), pass)
 
   end subroutine predict_correct
 
   subroutine predict_correct_with_forward_backward(dt, block, old, new, pass)
 
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
     type(block_type), intent(inout) :: block
     integer, intent(in) :: old
     integer, intent(in) :: new
     integer, intent(in) :: pass
 
-    call space_operators(block, block%state(old), block%tend(old), 0.5_r8 * dt, pass + forward_pass)
-    call update_state(0.5_r8 * dt, block, block%tend(old), block%state(old), block%state(new)) ! Update phs, pt, du, dv
-    call space_operators(block, block%state(new), block%tend(old), 0.5_r8 * dt, pass + backward_pass)
-    call update_state(0.5_r8 * dt, block, block%tend(old), block%state(old), block%state(new)) ! Update u, v
+    call space_operators(block, block%state(old), block%tend(old), 0.5d0 * dt, pass + forward_pass)
+    call update_state(0.5d0 * dt, block, block%tend(old), block%state(old), block%state(new), pass) ! Update phs, pt, du, dv
+    call space_operators(block, block%state(new), block%tend(old), 0.5d0 * dt, pass + backward_pass)
+    call update_state(0.5d0 * dt, block, block%tend(old), block%state(old), block%state(new), pass) ! Update u, v
 
-    call space_operators(block, block%state(new), block%tend(old), 0.5_r8 * dt, pass + forward_pass)
-    call update_state(0.5_r8 * dt, block, block%tend(old), block%state(old), block%state(new)) ! Update phs, pt, du, dv
-    call space_operators(block, block%state(new), block%tend(old), 0.5_r8 * dt, pass + backward_pass)
-    call update_state(0.5_r8 * dt, block, block%tend(old), block%state(old), block%state(new)) ! Update u, v
+    call space_operators(block, block%state(new), block%tend(old), 0.5d0 * dt, pass + forward_pass)
+    call update_state(0.5d0 * dt, block, block%tend(old), block%state(old), block%state(new), pass) ! Update phs, pt, du, dv
+    call space_operators(block, block%state(new), block%tend(old), 0.5d0 * dt, pass + backward_pass)
+    call update_state(0.5d0 * dt, block, block%tend(old), block%state(old), block%state(new), pass) ! Update u, v
 
-    call space_operators(block, block%state(new), block%tend(new),          dt, pass + forward_pass)
-    call update_state(         dt, block, block%tend(new), block%state(old), block%state(new)) ! Update phs, pt, du, dv
-    call space_operators(block, block%state(new), block%tend(new),          dt, pass + backward_pass)
-    call update_state(         dt, block, block%tend(new), block%state(old), block%state(new)) ! Update u, v
+    call space_operators(block, block%state(new), block%tend(new),         dt, pass + forward_pass)
+    call update_state(        dt, block, block%tend(new), block%state(old), block%state(new), pass) ! Update phs, pt, du, dv
+    call space_operators(block, block%state(new), block%tend(new),         dt, pass + backward_pass)
+    call update_state(        dt, block, block%tend(new), block%state(old), block%state(new), pass) ! Update u, v
 
   end subroutine predict_correct_with_forward_backward
 
   subroutine runge_kutta_3rd(dt, block, old, new, pass)
 
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
     type(block_type), intent(inout) :: block
     integer, intent(in) :: old
     integer, intent(in) :: new
@@ -656,14 +718,14 @@ contains
     s2 = 4
     s3 = new
 
-    call space_operators(block, block%state(old), block%tend(s1), 0.5_r8 * dt, pass)
-    call update_state(0.5_r8 * dt, block, block%tend(s1), block%state(old), block%state(s1))
+    call space_operators(block, block%state(old), block%tend(s1), 0.5d0 * dt, pass)
+    call update_state(0.5d0 * dt, block, block%tend(s1), block%state(old), block%state(s1), pass)
 
-    call space_operators(block, block%state(s1) , block%tend(s2), 2.0_r8 * dt, pass)
-    call update_state(        -dt, block, block%tend(s1), block%state(old), block%state(s2))
-    call update_state(2.0_r8 * dt, block, block%tend(s2), block%state(s2) , block%state(s2))
+    call space_operators(block, block%state(s1) , block%tend(s2), 2.0d0 * dt, pass)
+    call update_state(       -dt, block, block%tend(s1), block%state(old), block%state(s2), pass)
+    call update_state(2.0d0 * dt, block, block%tend(s2), block%state(s2) , block%state(s2), pass)
 
-    call space_operators(block, block%state(s2) , block%tend(s3),          dt, pass)
+    call space_operators(block, block%state(s2) , block%tend(s3),         dt, pass)
     block%tend(old)%du = (block%tend(s1)%du + 4.0_r8 * block%tend(s2)%du + block%tend(s3)%du) / 6.0_r8
     block%tend(old)%dv = (block%tend(s1)%dv + 4.0_r8 * block%tend(s2)%dv + block%tend(s3)%dv) / 6.0_r8
     if (baroclinic) then
@@ -672,13 +734,13 @@ contains
     else
       block%tend(old)%dgz = (block%tend(s1)%dgz + 4.0_r8 * block%tend(s2)%dgz + block%tend(s3)%dgz) / 6.0_r8
     end if
-    call update_state(         dt, block, block%tend(old), block%state(old), block%state(new))
+    call update_state(       dt, block, block%tend(old), block%state(old), block%state(new), pass)
 
   end subroutine runge_kutta_3rd
 
   subroutine runge_kutta_4th(dt, block, old, new, pass)
 
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
     type(block_type), intent(inout) :: block
     integer, intent(in) :: old
     integer, intent(in) :: new
@@ -691,16 +753,16 @@ contains
     s3 = 5
     s4 = new
 
-    call space_operators(block, block%state(old), block%tend(s1), 0.5_r8 * dt, pass)
-    call update_state(0.5_r8 * dt, block, block%tend(s1), block%state(old), block%state(s1))
+    call space_operators(block, block%state(old), block%tend(s1), 0.5d0 * dt, pass)
+    call update_state(0.5d0 * dt, block, block%tend(s1), block%state(old), block%state(s1), pass)
 
-    call space_operators(block, block%state(s1) , block%tend(s2), 0.5_r8 * dt, pass)
-    call update_state(0.5_r8 * dt, block, block%tend(s2), block%state(old), block%state(s2))
+    call space_operators(block, block%state(s1) , block%tend(s2), 0.5d0 * dt, pass)
+    call update_state(0.5d0 * dt, block, block%tend(s2), block%state(old), block%state(s2), pass)
 
-    call space_operators(block, block%state(s2) , block%tend(s3),          dt, pass)
-    call update_state(         dt, block, block%tend(s3), block%state(old), block%state(s3))
+    call space_operators(block, block%state(s2) , block%tend(s3),         dt, pass)
+    call update_state(        dt, block, block%tend(s3), block%state(old), block%state(s3), pass)
 
-    call space_operators(block, block%state(s3) , block%tend(s4),          dt, pass)
+    call space_operators(block, block%state(s3) , block%tend(s4),         dt, pass)
     block%tend(old)%du = (block%tend(s1)%du + 2.0_r8 * block%tend(s2)%du + 2.0_r8 * block%tend(s3)%du + block%tend(s4)%du) / 6.0_r8
     block%tend(old)%dv = (block%tend(s1)%dv + 2.0_r8 * block%tend(s2)%dv + 2.0_r8 * block%tend(s3)%dv + block%tend(s4)%dv) / 6.0_r8
     if (baroclinic) then
@@ -709,22 +771,25 @@ contains
     else
       block%tend(old)%dgz = (block%tend(s1)%dgz + 2.0_r8 * block%tend(s2)%dgz + 2.0_r8 * block%tend(s3)%dgz + block%tend(s4)%dgz) / 6.0_r8
     end if
-    call update_state(         dt, block, block%tend(old), block%state(old), block%state(new))
+    call update_state(        dt, block, block%tend(old), block%state(old), block%state(new), pass)
 
   end subroutine runge_kutta_4th
 
-  subroutine update_state(dt, block, tend, old_state, new_state)
+  subroutine update_state(dt, block, tend, old_state, new_state, pass)
 
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
     type(block_type), intent(inout) :: block
     type(tend_type), intent(in) :: tend
     type(state_type), intent(in) :: old_state
     type(state_type), intent(inout) :: new_state
+    integer, intent(in) :: pass
 
     type(mesh_type), pointer :: mesh
+    logical do_div_damp
     integer i, j, k
 
     mesh => old_state%mesh
+    do_div_damp = use_div_damp .and. pass == slow_pass
 
     if (baroclinic) then
       if (tend%updated_dphs) then
@@ -780,7 +845,7 @@ contains
           end do
         end do
       end do
-      if (.not. use_div_damp) call fill_halo(block, new_state%u, full_lon=.false., full_lat=.true., full_lev=.true.)
+      if (.not. do_div_damp) call fill_halo(block, new_state%u, full_lon=.false., full_lat=.true., full_lev=.true.)
     end if
 
     if (tend%updated_dv) then
@@ -791,12 +856,12 @@ contains
           end do
         end do
       end do
-      if (.not. use_div_damp) call fill_halo(block, new_state%v, full_lon=.true., full_lat=.false., full_lev=.true.)
+      if (.not. do_div_damp) call fill_halo(block, new_state%v, full_lon=.true., full_lat=.false., full_lev=.true.)
     end if
 
     if (tend%updated_du .and. tend%updated_dv) then
       call damp_state(block, new_state)
-      if (use_div_damp) call div_damp(block, old_state, new_state, dt)
+      if (do_div_damp) call div_damp(block, old_state, new_state, dt)
     end if
 
   end subroutine update_state

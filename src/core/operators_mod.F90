@@ -52,7 +52,7 @@ contains
 
     type(block_type), intent(inout) :: blocks(:)
     integer, intent(in) :: itime
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
 
     integer iblk
 
@@ -75,26 +75,29 @@ contains
 
   end subroutine operators_prepare_1
 
-  subroutine operators_prepare_2(block, state, dt)
+  subroutine operators_prepare_2(block, state, dt, pass)
 
     type(block_type), intent(in) :: block
     type(state_type), intent(inout) :: state
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
+    integer, intent(in) :: pass
 
     call calc_ph_lev_ph           (block, state)
     call calc_m                   (block, state)
     call calc_ak                  (block, state)
     call calc_t                   (block, state)
     call calc_m_lon_m_lat         (block, state)
-    call calc_m_vtx               (block, state)
     call calc_mf_lon_n_mf_lat_n   (block, state)
     call calc_mf_lon_t_mf_lat_t   (block, state)
-    call calc_pv_vtx              (block, state)
-    call calc_pv_edge             (block, state, dt)
     call calc_ke_cell             (block, state)
     call calc_gz_lev_gz           (block, state)
     call calc_pt_lon_pt_lat_pt_lev(block, state)
-    call calc_div                 (block, state)
+    if (pass == all_pass .or. pass == slow_pass) then
+      call calc_m_vtx             (block, state)
+      call calc_pv_vtx            (block, state)
+      call calc_pv_edge           (block, state, dt)
+      call calc_div               (block, state)
+    end if
 
   end subroutine operators_prepare_2
 
@@ -208,7 +211,7 @@ contains
     type(block_type), intent(in) :: block
     type(state_type), intent(inout) :: state
     type(tend_type), intent(inout) :: tend
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
 
     type(mesh_type), pointer :: mesh
     integer i, j, k, l
@@ -251,7 +254,7 @@ contains
     type(block_type), intent(in) :: block
     type(state_type), intent(inout) :: state
     type(tend_type), intent(in) :: tend
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
 
     type(mesh_type), pointer :: mesh
     integer i, j, k, l
@@ -577,7 +580,7 @@ contains
     
     type(block_type), intent(in) :: block
     type(state_type), intent(inout) :: state 
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
 
     select case (pv_scheme)
     case (1)
@@ -598,7 +601,7 @@ contains
     type(block_type), intent(inout) :: block
     type(state_type), intent(inout) :: state
     type(tend_type), intent(inout) :: tend
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
 
     type(mesh_type), pointer :: mesh
     integer i, j, k, move
@@ -878,7 +881,7 @@ contains
     type(block_type), intent(inout), target :: block
     type(state_type), intent(inout) :: state
     type(tend_type), intent(inout) :: tend
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
 
     type(mesh_type), pointer :: mesh
     type(reduced_mesh_type), pointer :: reduced_mesh
@@ -1225,7 +1228,7 @@ contains
     type(block_type), intent(inout), target :: block
     type(state_type), intent(inout) :: state
     type(tend_type), intent(inout) :: tend
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
 
     type(mesh_type), pointer :: mesh
     type(reduced_mesh_type), pointer :: reduced_mesh
@@ -1420,7 +1423,7 @@ contains
     type(block_type), intent(inout) :: block
     type(state_type), intent(inout) :: state
     type(tend_type), intent(inout) :: tend
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
 
     type(mesh_type), pointer :: mesh
     integer i, j, k, move
@@ -1469,7 +1472,7 @@ contains
     type(block_type), intent(inout) :: block
     type(state_type), intent(inout) :: state
     type(tend_type), intent(inout) :: tend
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
 
     type(mesh_type), pointer :: mesh
     integer i, j, k, move
@@ -1517,7 +1520,7 @@ contains
     type(block_type), intent(inout) :: block
     type(state_type), intent(inout) :: state
     type(tend_type), intent(inout) :: tend
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
 
     type(mesh_type), pointer :: mesh
     integer i, j, k, move
@@ -1583,7 +1586,7 @@ contains
     type(block_type), intent(inout) :: block
     type(state_type), intent(in) :: state
     type(tend_type), intent(inout) :: tend
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
 
     type(mesh_type), pointer :: mesh
     integer i, j, k, move
@@ -1674,7 +1677,7 @@ contains
     type(block_type), intent(inout) :: block
     type(state_type), intent(in) :: state
     type(tend_type), intent(inout) :: tend
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
 
     type(mesh_type), pointer :: mesh
     integer i, j, k, move
@@ -1769,7 +1772,7 @@ contains
     type(block_type), intent(inout) :: block
     type(state_type), intent(in) :: state
     type(tend_type), intent(inout) :: tend
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
 
     type(mesh_type), pointer :: mesh
     integer i, j, k, move
@@ -1795,7 +1798,7 @@ contains
     type(block_type), intent(inout) :: block
     type(state_type), intent(in) :: state
     type(tend_type), intent(inout) :: tend
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
 
     type(mesh_type), pointer :: mesh
     integer i, j, k
@@ -1818,7 +1821,7 @@ contains
     type(block_type), intent(inout) :: block
     type(state_type), intent(in) :: state
     type(tend_type), intent(inout) :: tend
-    real(r8), intent(in) :: dt
+    real(8), intent(in) :: dt
 
     type(mesh_type), pointer :: mesh
     integer i, j, k

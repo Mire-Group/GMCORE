@@ -33,7 +33,7 @@ contains
     character(4) lat_dims(4), lat_dims_2d(3)
     character(4) vtx_dims(4), vtx_dims_2d(3)
     character(4) cell_lev_dims(4), lon_lev_dims(4), lat_lev_dims(4), lev_dims(4)
-    real(r8) seconds
+    real(8) seconds
 
     if (history_interval(1) == 'N/A') call log_error('Parameter history_interval is not set!')
     if (case_name == 'N/A') call log_error('Parameter case_name is not set!')
@@ -191,14 +191,14 @@ contains
     integer iblk, is, ie, js, je, ks, ke
     integer start(3), count(3)
 
-    call fiona_start_output('h0', elapsed_seconds, new_file=time_step==0)
-    call fiona_output('h0', 'lon' , global_mesh%full_lon_deg(1:global_mesh%num_full_lon))
-    call fiona_output('h0', 'lat' , global_mesh%full_lat_deg(1:global_mesh%num_full_lat))
-    call fiona_output('h0', 'ilon', global_mesh%half_lon_deg(1:global_mesh%num_half_lon))
-    call fiona_output('h0', 'ilat', global_mesh%half_lat_deg(1:global_mesh%num_half_lat))
+    call fiona_start_output('h0', dble(elapsed_seconds), new_file=time_step==0)
+    call fiona_output('h0', 'lon' , dble(global_mesh%full_lon_deg(1:global_mesh%num_full_lon)))
+    call fiona_output('h0', 'lat' , dble(global_mesh%full_lat_deg(1:global_mesh%num_full_lat)))
+    call fiona_output('h0', 'ilon', dble(global_mesh%half_lon_deg(1:global_mesh%num_half_lon)))
+    call fiona_output('h0', 'ilat', dble(global_mesh%half_lat_deg(1:global_mesh%num_half_lat)))
     if (baroclinic) then
-      call fiona_output('h0', 'lev' , global_mesh%full_lev)
-      call fiona_output('h0', 'ilev', global_mesh%half_lev)
+      call fiona_output('h0', 'lev' , dble(global_mesh%full_lev))
+      call fiona_output('h0', 'ilev', dble(global_mesh%half_lev))
     end if
 
     do iblk = 1, size(blocks)
@@ -212,16 +212,16 @@ contains
       start = [is,js,ks]
       count = [mesh%num_full_lon,mesh%num_full_lat,mesh%num_full_lev]
 
-      call fiona_output('h0', 'zs' , static%gzs(is:ie,js:je      ) / g, start=start, count=count)
-      call fiona_output('h0', 'z'  , state %gz (is:ie,js:je,ks:ke) / g, start=start, count=count)
+      call fiona_output('h0', 'zs' , dble(static%gzs(is:ie,js:je      ) / g), start=start, count=count)
+      call fiona_output('h0', 'z'  , dble(state %gz (is:ie,js:je,ks:ke) / g), start=start, count=count)
 
       if (baroclinic) then
-        call fiona_output('h0', 't'     , state%t     (is:ie,js:je,ks:ke), start=start, count=count)
-        call fiona_output('h0', 't850'  , state%t850  (is:ie,js:je      ), start=start, count=count)
-        call fiona_output('h0', 't700'  , state%t700  (is:ie,js:je      ), start=start, count=count)
-        call fiona_output('h0', 'pt'    , state%pt    (is:ie,js:je,ks:ke), start=start, count=count)
-        call fiona_output('h0', 'phs'   , state%phs   (is:ie,js:je      ), start=start, count=count)
-        call fiona_output('h0', 'ph'    , state%ph    (is:ie,js:je,ks:ke), start=start, count=count)
+        call fiona_output('h0', 't'     , dble(state%t     (is:ie,js:je,ks:ke)), start=start, count=count)
+        call fiona_output('h0', 't850'  , dble(state%t850  (is:ie,js:je      )), start=start, count=count)
+        call fiona_output('h0', 't700'  , dble(state%t700  (is:ie,js:je      )), start=start, count=count)
+        call fiona_output('h0', 'pt'    , dble(state%pt    (is:ie,js:je,ks:ke)), start=start, count=count)
+        call fiona_output('h0', 'phs'   , dble(state%phs   (is:ie,js:je      )), start=start, count=count)
+        call fiona_output('h0', 'ph'    , dble(state%ph    (is:ie,js:je,ks:ke)), start=start, count=count)
       end if
 
       is = mesh%half_lon_ibeg; ie = mesh%half_lon_iend
@@ -230,7 +230,7 @@ contains
       start = [is,js,ks]
       count = [mesh%num_half_lon,mesh%num_full_lat,mesh%num_full_lev]
 
-      call fiona_output('h0', 'u'  , state %u  (is:ie,js:je,ks:ke), start=start, count=count)
+      call fiona_output('h0', 'u'  , dble(state %u  (is:ie,js:je,ks:ke)), start=start, count=count)
 
       is = mesh%full_lon_ibeg; ie = mesh%full_lon_iend
       js = mesh%half_lat_ibeg; je = mesh%half_lat_iend
@@ -238,7 +238,7 @@ contains
       start = [is,js,ks]
       count = [mesh%num_full_lon,mesh%num_half_lat,mesh%num_full_lev]
 
-      call fiona_output('h0', 'v'  , state %v  (is:ie,js:je,ks:ke), start=start, count=count)
+      call fiona_output('h0', 'v'  , dble(state %v  (is:ie,js:je,ks:ke)), start=start, count=count)
 
       is = mesh%half_lon_ibeg; ie = mesh%half_lon_iend
       js = mesh%half_lat_ibeg; je = mesh%half_lat_iend
@@ -246,12 +246,12 @@ contains
       start = [is,js,ks]
       count = [mesh%num_half_lon,mesh%num_half_lat,mesh%num_full_lev]
 
-      call fiona_output('h0', 'pv' , state %pv (is:ie,js:je,ks:ke), start=start, count=count)
+      call fiona_output('h0', 'pv' , dble(state %pv (is:ie,js:je,ks:ke)), start=start, count=count)
 
-      call fiona_output('h0', 'tm' , state %tm)
-      call fiona_output('h0', 'te' , state %te)
-      call fiona_output('h0', 'tpe', state %tpe)
-      call fiona_output('h0', 'tpv', state %tav)
+      call fiona_output('h0', 'tm' , dble(state %tm ))
+      call fiona_output('h0', 'te' , dble(state %te ))
+      call fiona_output('h0', 'tpe', dble(state %tpe))
+      call fiona_output('h0', 'tpv', dble(state %tav))
     end do
     call fiona_end_output('h0')
 
@@ -273,14 +273,14 @@ contains
     state => blocks(1)%state(itime)
     tend => blocks(1)%tend(itime)
 
-    call fiona_start_output('h1', elapsed_seconds, new_file=time_step==0)
-    call fiona_output('h1', 'lon'   , global_mesh%full_lon_deg(1:global_mesh%num_full_lon))
-    call fiona_output('h1', 'lat'   , global_mesh%full_lat_deg(1:global_mesh%num_full_lat))
-    call fiona_output('h1', 'ilon'  , global_mesh%half_lon_deg(1:global_mesh%num_half_lon))
-    call fiona_output('h1', 'ilat'  , global_mesh%half_lat_deg(1:global_mesh%num_half_lat))
+    call fiona_start_output('h1', dble(elapsed_seconds), new_file=time_step==0)
+    call fiona_output('h1', 'lon'   , dble(global_mesh%full_lon_deg(1:global_mesh%num_full_lon)))
+    call fiona_output('h1', 'lat'   , dble(global_mesh%full_lat_deg(1:global_mesh%num_full_lat)))
+    call fiona_output('h1', 'ilon'  , dble(global_mesh%half_lon_deg(1:global_mesh%num_half_lon)))
+    call fiona_output('h1', 'ilat'  , dble(global_mesh%half_lat_deg(1:global_mesh%num_half_lat)))
     if (baroclinic) then
-      call fiona_output('h1', 'lev' , global_mesh%full_lev)
-      call fiona_output('h1', 'ilev', global_mesh%half_lev)
+      call fiona_output('h1', 'lev' , dble(global_mesh%full_lev))
+      call fiona_output('h1', 'ilev', dble(global_mesh%half_lev))
     end if
 
     is = mesh%full_lon_ibeg; ie = mesh%full_lon_iend
@@ -289,18 +289,18 @@ contains
     start = [is,js,ks]
     count = [mesh%num_full_lon,mesh%num_full_lat,mesh%num_full_lev]
 
-    call fiona_output('h1', 'dmfdlon' , tend%dmfdlon  (is:ie,js:je,ks:ke), start=start, count=count)
-    call fiona_output('h1', 'dmfdlat' , tend%dmfdlat  (is:ie,js:je,ks:ke), start=start, count=count)
-    call fiona_output('h1', 'ke'      , state%ke      (is:ie,js:je,ks:ke), start=start, count=count)
+    call fiona_output('h1', 'dmfdlon' , dble(tend%dmfdlon  (is:ie,js:je,ks:ke)), start=start, count=count)
+    call fiona_output('h1', 'dmfdlat' , dble(tend%dmfdlat  (is:ie,js:je,ks:ke)), start=start, count=count)
+    call fiona_output('h1', 'ke'      , dble(state%ke      (is:ie,js:je,ks:ke)), start=start, count=count)
     if (baroclinic) then
-      call fiona_output('h1', 'm'       , state%m      (is:ie,js:je,ks:ke), start=start, count=count)
-      call fiona_output('h1', 'dphs'    , tend%dphs    (is:ie,js:je      ), start=start, count=count)
-      call fiona_output('h1', 'dptfdlon', tend%dptfdlon(is:ie,js:je,ks:ke), start=start, count=count)
-      call fiona_output('h1', 'dptfdlat', tend%dptfdlat(is:ie,js:je,ks:ke), start=start, count=count)
-      call fiona_output('h1', 'dptfdlev', tend%dptfdlev(is:ie,js:je,ks:ke), start=start, count=count)
-      call fiona_output('h1', 'wp'      , state%wp     (is:ie,js:je,ks:ke), start=start, count=count)
-      call fiona_output('h1', 'div'     , state%div    (is:ie,js:je,ks:ke), start=start, count=count)
-      call fiona_output('h1', 'div2'    , state%div2   (is:ie,js:je,ks:ke), start=start, count=count)
+      call fiona_output('h1', 'm'       , dble(state%m      (is:ie,js:je,ks:ke)), start=start, count=count)
+      call fiona_output('h1', 'dphs'    , dble(tend%dphs    (is:ie,js:je      )), start=start, count=count)
+      call fiona_output('h1', 'dptfdlon', dble(tend%dptfdlon(is:ie,js:je,ks:ke)), start=start, count=count)
+      call fiona_output('h1', 'dptfdlat', dble(tend%dptfdlat(is:ie,js:je,ks:ke)), start=start, count=count)
+      call fiona_output('h1', 'dptfdlev', dble(tend%dptfdlev(is:ie,js:je,ks:ke)), start=start, count=count)
+      call fiona_output('h1', 'wp'      , dble(state%wp     (is:ie,js:je,ks:ke)), start=start, count=count)
+      call fiona_output('h1', 'div'     , dble(state%div    (is:ie,js:je,ks:ke)), start=start, count=count)
+      call fiona_output('h1', 'div2'    , dble(state%div2   (is:ie,js:je,ks:ke)), start=start, count=count)
     end if
 
     is = mesh%half_lon_ibeg; ie = mesh%half_lon_iend
@@ -309,17 +309,17 @@ contains
     start = [is,js,ks]
     count = [mesh%num_half_lon,mesh%num_full_lat,mesh%num_full_lev]
 
-    call fiona_output('h1', 'qhv'     , tend%qhv      (is:ie,js:je,ks:ke), start=start, count=count)
-    call fiona_output('h1', 'dpedlon' , tend%dpedlon  (is:ie,js:je,ks:ke), start=start, count=count)
-    call fiona_output('h1', 'dkedlon' , tend%dkedlon  (is:ie,js:je,ks:ke), start=start, count=count)
-    call fiona_output('h1', 'm_lon'   , state%m_lon   (is:ie,js:je,ks:ke), start=start, count=count)
-    call fiona_output('h1', 'mf_lon_n', state%mf_lon_n(is:ie,js:je,ks:ke), start=start, count=count)
-    call fiona_output('h1', 'mf_lon_t', state%mf_lon_t(is:ie,js:je,ks:ke), start=start, count=count)
-    call fiona_output('h1', 'pv_lon'  , state%pv_lon  (is:ie,js:je,ks:ke), start=start, count=count)
+    call fiona_output('h1', 'qhv'     , dble(tend%qhv      (is:ie,js:je,ks:ke)), start=start, count=count)
+    call fiona_output('h1', 'dpedlon' , dble(tend%dpedlon  (is:ie,js:je,ks:ke)), start=start, count=count)
+    call fiona_output('h1', 'dkedlon' , dble(tend%dkedlon  (is:ie,js:je,ks:ke)), start=start, count=count)
+    call fiona_output('h1', 'm_lon'   , dble(state%m_lon   (is:ie,js:je,ks:ke)), start=start, count=count)
+    call fiona_output('h1', 'mf_lon_n', dble(state%mf_lon_n(is:ie,js:je,ks:ke)), start=start, count=count)
+    call fiona_output('h1', 'mf_lon_t', dble(state%mf_lon_t(is:ie,js:je,ks:ke)), start=start, count=count)
+    call fiona_output('h1', 'pv_lon'  , dble(state%pv_lon  (is:ie,js:je,ks:ke)), start=start, count=count)
 
     if (baroclinic) then
-      call fiona_output('h1', 'dpdlon'  , tend%dpdlon  (is:ie,js:je,ks:ke), start=start, count=count)
-      call fiona_output('h1', 'wedudlev', tend%wedudlev(is:ie,js:je,ks:ke), start=start, count=count)
+      call fiona_output('h1', 'dpdlon'  , dble(tend%dpdlon  (is:ie,js:je,ks:ke)), start=start, count=count)
+      call fiona_output('h1', 'wedudlev', dble(tend%wedudlev(is:ie,js:je,ks:ke)), start=start, count=count)
     end if
 
     is = mesh%full_lon_ibeg; ie = mesh%full_lon_iend
@@ -328,17 +328,17 @@ contains
     start = [is,js,ks]
     count = [mesh%num_full_lon,mesh%num_half_lat,mesh%num_full_lev]
 
-    call fiona_output('h1', 'qhu'     , tend%qhu      (is:ie,js:je,ks:ke), start=start, count=count)
-    call fiona_output('h1', 'dpedlat' , tend%dpedlat  (is:ie,js:je,ks:ke), start=start, count=count)
-    call fiona_output('h1', 'dkedlat' , tend%dkedlat  (is:ie,js:je,ks:ke), start=start, count=count)
-    call fiona_output('h1', 'm_lat'   , state%m_lat   (is:ie,js:je,ks:ke), start=start, count=count)
-    call fiona_output('h1', 'mf_lat_n', state%mf_lat_n(is:ie,js:je,ks:ke), start=start, count=count)
-    call fiona_output('h1', 'mf_lat_t', state%mf_lat_t(is:ie,js:je,ks:ke), start=start, count=count)
-    call fiona_output('h1', 'pv_lat'  , state%pv_lat  (is:ie,js:je,ks:ke), start=start, count=count)
+    call fiona_output('h1', 'qhu'     , dble(tend%qhu      (is:ie,js:je,ks:ke)), start=start, count=count)
+    call fiona_output('h1', 'dpedlat' , dble(tend%dpedlat  (is:ie,js:je,ks:ke)), start=start, count=count)
+    call fiona_output('h1', 'dkedlat' , dble(tend%dkedlat  (is:ie,js:je,ks:ke)), start=start, count=count)
+    call fiona_output('h1', 'm_lat'   , dble(state%m_lat   (is:ie,js:je,ks:ke)), start=start, count=count)
+    call fiona_output('h1', 'mf_lat_n', dble(state%mf_lat_n(is:ie,js:je,ks:ke)), start=start, count=count)
+    call fiona_output('h1', 'mf_lat_t', dble(state%mf_lat_t(is:ie,js:je,ks:ke)), start=start, count=count)
+    call fiona_output('h1', 'pv_lat'  , dble(state%pv_lat  (is:ie,js:je,ks:ke)), start=start, count=count)
 
     if (baroclinic) then
-      call fiona_output('h1', 'dpdlat'  , tend%dpdlat  (is:ie,js:je,ks:ke), start=start, count=count)
-      call fiona_output('h1', 'wedvdlev', tend%wedvdlev(is:ie,js:je,ks:ke), start=start, count=count)
+      call fiona_output('h1', 'dpdlat'  , dble(tend%dpdlat  (is:ie,js:je,ks:ke)), start=start, count=count)
+      call fiona_output('h1', 'wedvdlev', dble(tend%wedvdlev(is:ie,js:je,ks:ke)), start=start, count=count)
     end if
 
     is = mesh%half_lon_ibeg; ie = mesh%half_lon_iend
@@ -347,7 +347,7 @@ contains
     start = [is,js,ks]
     count = [mesh%num_half_lon,mesh%num_half_lat,mesh%num_full_lev]
 
-    call fiona_output('h1', 'm_vtx', state%m_vtx(is:ie,js:je,ks:ke), start=start, count=count)
+    call fiona_output('h1', 'm_vtx', dble(state%m_vtx(is:ie,js:je,ks:ke)), start=start, count=count)
 
     is = mesh%full_lon_ibeg; ie = mesh%full_lon_iend
     js = mesh%full_lat_ibeg; je = mesh%full_lat_iend
@@ -356,9 +356,9 @@ contains
     count = [mesh%num_full_lon,mesh%num_full_lat,mesh%num_half_lev]
 
     if (baroclinic) then
-      call fiona_output('h1', 'wedphdlev', state%wedphdlev(is:ie,js:je,ks:ke), start=start, count=count)
-      call fiona_output('h1', 'pt_lev'   , state%pt_lev   (is:ie,js:je,ks:ke), start=start, count=count)
-      call fiona_output('h1', 'ph_lev'   , state%ph_lev   (is:ie,js:je,ks:ke), start=start, count=count)
+      call fiona_output('h1', 'wedphdlev', dble(state%wedphdlev(is:ie,js:je,ks:ke)), start=start, count=count)
+      call fiona_output('h1', 'pt_lev'   , dble(state%pt_lev   (is:ie,js:je,ks:ke)), start=start, count=count)
+      call fiona_output('h1', 'ph_lev'   , dble(state%ph_lev   (is:ie,js:je,ks:ke)), start=start, count=count)
     end if
 
     is = mesh%half_lon_ibeg; ie = mesh%half_lon_iend
@@ -368,7 +368,7 @@ contains
     count = [mesh%num_half_lon,mesh%num_full_lat,mesh%num_half_lev]
 
     if (baroclinic) then
-      call fiona_output('h1', 'wedphdlev_lon', state%wedphdlev_lon(is:ie,js:je,ks:ke), start=start, count=count)
+      call fiona_output('h1', 'wedphdlev_lon', dble(state%wedphdlev_lon(is:ie,js:je,ks:ke)), start=start, count=count)
     end if
 
     is = mesh%full_lon_ibeg; ie = mesh%full_lon_iend
@@ -378,7 +378,7 @@ contains
     count = [mesh%num_full_lon,mesh%num_half_lat,mesh%num_half_lev]
 
     if (baroclinic) then
-      call fiona_output('h1', 'wedphdlev_lat', state%wedphdlev_lat(is:ie,js:je,ks:ke), start=start, count=count)
+      call fiona_output('h1', 'wedphdlev_lat', dble(state%wedphdlev_lat(is:ie,js:je,ks:ke)), start=start, count=count)
     end if
 
     call fiona_end_output('h1')

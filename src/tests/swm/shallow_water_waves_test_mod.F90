@@ -51,7 +51,7 @@ module shallow_water_waves_test_mod
 
   use flogger
   use string
-  use const_mod, only: inf
+  use const_mod, only: r8, inf
   use parallel_mod
   use block_mod
 
@@ -61,7 +61,7 @@ module shallow_water_waves_test_mod
 
   public shallow_water_waves_test_set_initial_condition
 
-  integer, parameter :: dp = selected_real_kind(15,307)
+  integer, parameter :: dp = r8
 
 !========================================================================
 ! parameters
@@ -110,7 +110,7 @@ contains
                    mesh%half_lat(mesh%half_lat_lb:mesh%half_lat_ub), &
                    mesh%half_lon(mesh%half_lon_lb:mesh%half_lon_ub), [0.0_dp], u, v, h, 0)
     call getPhaseSpeed(C, 0)
-    if (is_root_proc()) call log_notice('Phase speed is ' // trim(to_string(C, 20)))
+    if (is_root_proc()) call log_notice('Phase speed is ' // trim(to_string(dble(C), 20)))
 
     do j = mesh%full_lat_ibeg, mesh%full_lat_iend
       do i = mesh%full_lon_ibeg, mesh%full_lon_iend
