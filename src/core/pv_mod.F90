@@ -18,8 +18,7 @@ module pv_mod
 
 contains
 
-  subroutine calc_pv_vtx(block, state)
-
+  subroutine calc_vor_vtx(block, state)
     type(block_type), intent(in) :: block
     type(state_type), intent(inout) :: state
 
@@ -33,23 +32,19 @@ contains
       do j = mesh%half_lat_ibeg_no_pole, mesh%half_lat_iend_no_pole
         do i = mesh%half_lon_ibeg, mesh%half_lon_iend
 #ifdef V_POLE
-          state%pv(i,j,k) = (                                                                 &
-            (                                                                                 &
+          state%vor(i,j,k) = (                                                                                 &
               state%u(i  ,j-1,k) * mesh%de_lon(j-1) - state%u(i  ,j  ,k) * mesh%de_lon(j  ) + &
               state%v(i+1,j  ,k) * mesh%de_lat(j  ) - state%v(i  ,j  ,k) * mesh%de_lat(j  )   &
-            ) / mesh%area_vtx(j) + mesh%half_f(j)                                             &
-          ) / state%m_vtx(i,j,k)
+                             ) / mesh%area_vtx(j)                                            
 #else
-          state%pv(i,j,k) = (                                                                 &
-            (                                                                                 &
+          state%vor(i,j,k) = (                                                                                 &
               state%u(i  ,j  ,k) * mesh%de_lon(j  ) - state%u(i  ,j+1,k) * mesh%de_lon(j+1) + &
               state%v(i+1,j  ,k) * mesh%de_lat(j  ) - state%v(i  ,j  ,k) * mesh%de_lat(j  )   &
-            ) / mesh%area_vtx(j) + mesh%half_f(j)                                             &
-          ) / state%m_vtx(i,j,k)
+                             ) / mesh%area_vtx(j)
 #endif
         end do
       end do
-    end do
+    end do  
 #ifdef V_POLE
     if (mesh%has_south_pole()) then
       j = mesh%half_lat_ibeg
@@ -63,7 +58,7 @@ contains
       pole = pole / mesh%num_half_lon / mesh%area_vtx(j)
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
         do i = mesh%half_lon_ibeg, mesh%half_lon_iend
-          state%pv(i,j,k) = (pole(k) + mesh%half_f(j)) / state%m_vtx(i,j,k)
+          state%vor(i,j,k) = pole(k) 
         end do
       end do
     end if
@@ -79,7 +74,7 @@ contains
       pole = pole / mesh%num_half_lon / mesh%area_vtx(j)
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
         do i = mesh%half_lon_ibeg, mesh%half_lon_iend
-          state%pv(i,j,k) = (pole(k) + mesh%half_f(j)) / state%m_vtx(i,j,k)
+          state%vor(i,j,k) = pole(k)
         end do
       end do
     end if
@@ -98,7 +93,7 @@ contains
         pole = pole / global_mesh%num_half_lon / mesh%area_vtx(j)
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
           do i = mesh%half_lon_ibeg, mesh%half_lon_iend
-            state%pv(i,j,k) = (pole(k) + mesh%half_f(j)) / state%m_vtx(i,j,k)
+            state%vor(i,j,k) = pole(k)
           end do
         end do
       end if
@@ -114,12 +109,35 @@ contains
         pole = pole / global_mesh%num_half_lon / mesh%area_vtx(j)
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
           do i = mesh%half_lon_ibeg, mesh%half_lon_iend
-            state%pv(i,j,k) = (pole(k) + mesh%half_f(j)) / state%m_vtx(i,j,k)
+            state%vor(i,j,k) = pole(k)
           end do
         end do
       end if
     end if
 #endif
+    call fill_halo(block, state%vor, full_lon=.false., full_lat=.false., full_lev=.true.)   
+
+  end subroutine calc_vor_vtx
+
+  subroutine calc_pv_vtx(block, state)
+
+    type(block_type), intent(in) :: block
+    type(state_type), intent(inout) :: state
+    type(mesh_type), pointer :: mesh
+    integer i, j, k
+    
+    call calc_vor_vtx(block, state)
+
+    mesh => state%mesh
+    
+    do k = mesh%full_lev_ibeg, mesh%full_lev_iend
+      do j = mesh%half_lat_ibeg, mesh%half_lat_iend
+        do i = mesh%half_lon_ibeg, mesh%half_lon_iend
+          state%pv(i,j,k) = (state%vor(i,j,k) + mesh%half_f(j)) / state%m_vtx(i,j,k)
+        end do
+      end do
+    end do
+
     call fill_halo(block, state%pv, full_lon=.false., full_lat=.false., full_lev=.true.)
 
   end subroutine calc_pv_vtx
