@@ -266,7 +266,7 @@ contains
     logical, intent(in), optional :: south_halo
     logical, intent(in), optional :: north_halo
 
-    integer status(MPI_STATUS_SIZE), i, j, ierr
+    integer status(MPI_STATUS_SIZE), i, j, ihalo, ierr
 
     i = merge(1, 2, full_lon)
     j = merge(1, 2, full_lat)
@@ -284,15 +284,47 @@ contains
     end if
 
     if (merge(south_halo, .true., present(south_halo))) then
-      call MPI_SENDRECV(array, 1, block%halo(north)%send_type_2d(i,j), block%halo(north)%proc_id, 11, &
-                        array, 1, block%halo(south)%recv_type_2d(i,j), block%halo(south)%proc_id, 11, &
-                        proc%comm, status, ierr)
+      select case (proc%decomp_loc)
+      case (decomp_normal_region, decomp_reduce_south_region, decomp_reduce_north_region)
+        call MPI_SENDRECV(array, 1, block%halo(north)%send_type_2d(i,j), block%halo(north)%proc_id, 11, &
+                          array, 1, block%halo(south)%recv_type_2d(i,j), block%halo(south)%proc_id, 11, &
+                          proc%comm, status, ierr)
+      case (decomp_normal_south_boundary)
+        call MPI_RECV(array, 1, block%halo(south)%recv_type_2d(i,j), block%halo(south)%proc_id, 11, proc%comm, status, ierr)
+      case (decomp_normal_north_boundary)
+        call MPI_SEND(array, 1, block%halo(north)%send_type_2d(i,j), block%halo(north)%proc_id, 11, proc%comm, ierr)
+      case (decomp_reduce_south_boundary)
+        do ihalo = north, size(block%halo)
+          call MPI_SEND(array, 1, block%halo(north)%send_type_2d(i,j), block%halo(north)%proc_id, 11, proc%comm, ierr)
+        end do
+      case (decomp_reduce_north_boundary)
+        call MPI_RECV(array, 1, block%halo(south)%recv_type_2d(i,j), block%halo(south)%proc_id, 11, proc%comm, status, ierr)
+        do ihalo = north + 1, size(block%halo)
+          call MPI_RECV(array, 1, block%halo(ihalo)%recv_type_2d(i,j), block%halo(ihalo)%proc_id, 11, proc%comm, status, ierr)
+        end do
+      end select
     end if
 
     if (merge(north_halo, .true., present(north_halo))) then
-      call MPI_SENDRECV(array, 1, block%halo(south)%send_type_2d(i,j), block%halo(south)%proc_id, 15, &
-                        array, 1, block%halo(north)%recv_type_2d(i,j), block%halo(north)%proc_id, 15, &
-                        proc%comm, status, ierr)
+      select case (proc%decomp_loc)
+      case (decomp_normal_region, decomp_reduce_south_region, decomp_reduce_north_region)
+        call MPI_SENDRECV(array, 1, block%halo(south)%send_type_2d(i,j), block%halo(south)%proc_id, 15, &
+                          array, 1, block%halo(north)%recv_type_2d(i,j), block%halo(north)%proc_id, 15, &
+                          proc%comm, status, ierr)
+      case (decomp_normal_south_boundary)
+        call MPI_SEND(array, 1, block%halo(south)%send_type_2d(i,j), block%halo(south)%proc_id, 15, proc%comm, ierr)
+      case (decomp_normal_north_boundary)
+        call MPI_RECV(array, 1, block%halo(north)%recv_type_2d(i,j), block%halo(north)%proc_id, 15, proc%comm, status, ierr)
+      case (decomp_reduce_south_boundary)
+        do ihalo = north, size(block%halo)
+          call MPI_RECV(array, 1, block%halo(ihalo)%recv_type_2d(i,j), block%halo(ihalo)%proc_id, 15, proc%comm, status, ierr)
+        end do
+      case (decomp_reduce_north_boundary)
+        call MPI_SEND(array, 1, block%halo(south)%send_type_2d(i,j), block%halo(south)%proc_id, 15, proc%comm, ierr)
+        do ihalo = north + 1, size(block%halo)
+          call MPI_SEND(array, 1, block%halo(ihalo)%send_type_2d(i,j), block%halo(ihalo)%proc_id, 15, proc%comm, ierr)
+        end do
+      end select
     end if
 
   end subroutine fill_halo_2d_r8
@@ -310,6 +342,9 @@ contains
     logical, intent(in), optional :: north_halo
 
     integer i, j, ierr
+
+    call fill_halo_2d_r8(block, array, full_lon, full_lat, west_halo, east_halo, south_halo, north_halo)
+    return
 
     i = merge(1, 2, full_lon)
     j = merge(1, 2, full_lat)
@@ -356,7 +391,7 @@ contains
     logical, intent(in), optional :: south_halo
     logical, intent(in), optional :: north_halo
 
-    integer status(MPI_STATUS_SIZE), i, j, k, ierr
+    integer status(MPI_STATUS_SIZE), i, j, k, ihalo, ierr
 
     i = merge(1, 2, full_lon)
     j = merge(1, 2, full_lat)
@@ -375,15 +410,47 @@ contains
     end if
 
     if (merge(south_halo, .true., present(south_halo))) then
-      call MPI_SENDRECV(array, 1, block%halo(north)%send_type_3d(i,j,k), block%halo(north)%proc_id, 11, &
-                        array, 1, block%halo(south)%recv_type_3d(i,j,k), block%halo(south)%proc_id, 11, &
-                        proc%comm, status, ierr)
+      select case (proc%decomp_loc)
+      case (decomp_normal_region, decomp_reduce_south_region, decomp_reduce_north_region)
+        call MPI_SENDRECV(array, 1, block%halo(north)%send_type_3d(i,j,k), block%halo(north)%proc_id, 11, &
+                          array, 1, block%halo(south)%recv_type_3d(i,j,k), block%halo(south)%proc_id, 11, &
+                          proc%comm, status, ierr)
+      case (decomp_normal_south_boundary)
+        call MPI_RECV(array, 1, block%halo(south)%recv_type_2d(i,j), block%halo(south)%proc_id, 11, proc%comm, status, ierr)
+      case (decomp_normal_north_boundary)
+        call MPI_SEND(array, 1, block%halo(north)%send_type_2d(i,j), block%halo(north)%proc_id, 11, proc%comm, ierr)
+      case (decomp_reduce_south_boundary)
+        do ihalo = north, size(block%halo)
+          call MPI_SEND(array, 1, block%halo(north)%send_type_2d(i,j), block%halo(north)%proc_id, 11, proc%comm, ierr)
+        end do
+      case (decomp_reduce_north_boundary)
+        call MPI_RECV(array, 1, block%halo(south)%recv_type_2d(i,j), block%halo(south)%proc_id, 11, proc%comm, status, ierr)
+        do ihalo = north + 1, size(block%halo)
+          call MPI_RECV(array, 1, block%halo(ihalo)%recv_type_2d(i,j), block%halo(ihalo)%proc_id, 11, proc%comm, status, ierr)
+        end do
+      end select
     end if
 
     if (merge(north_halo, .true., present(north_halo))) then
-      call MPI_SENDRECV(array, 1, block%halo(south)%send_type_3d(i,j,k), block%halo(south)%proc_id, 15, &
-                        array, 1, block%halo(north)%recv_type_3d(i,j,k), block%halo(north)%proc_id, 15, &
-                        proc%comm, status, ierr)
+      select case (proc%decomp_loc)
+      case (decomp_normal_region, decomp_reduce_south_region, decomp_reduce_north_region)
+        call MPI_SENDRECV(array, 1, block%halo(south)%send_type_3d(i,j,k), block%halo(south)%proc_id, 15, &
+                          array, 1, block%halo(north)%recv_type_3d(i,j,k), block%halo(north)%proc_id, 15, &
+                          proc%comm, status, ierr)
+      case (decomp_normal_south_boundary)
+        call MPI_SEND(array, 1, block%halo(south)%send_type_2d(i,j), block%halo(south)%proc_id, 15, proc%comm, ierr)
+      case (decomp_normal_north_boundary)
+        call MPI_RECV(array, 1, block%halo(north)%recv_type_2d(i,j), block%halo(north)%proc_id, 15, proc%comm, status, ierr)
+      case (decomp_reduce_south_boundary)
+        do ihalo = north, size(block%halo)
+          call MPI_RECV(array, 1, block%halo(ihalo)%recv_type_2d(i,j), block%halo(ihalo)%proc_id, 15, proc%comm, status, ierr)
+        end do
+      case (decomp_reduce_north_boundary)
+        call MPI_SEND(array, 1, block%halo(south)%send_type_2d(i,j), block%halo(south)%proc_id, 15, proc%comm, ierr)
+        do ihalo = north + 1, size(block%halo)
+          call MPI_SEND(array, 1, block%halo(ihalo)%send_type_2d(i,j), block%halo(ihalo)%proc_id, 15, proc%comm, ierr)
+        end do
+      end select
     end if
 
   end subroutine fill_halo_3d_r8
@@ -402,6 +469,9 @@ contains
     logical, intent(in), optional :: north_halo
 
     integer i, j, k, ierr
+
+    call fill_halo_3d_r8(block, array, full_lon, full_lat, full_lev, west_halo, east_halo, south_halo, north_halo)
+    return
 
     i = merge(1, 2, full_lon)
     j = merge(1, 2, full_lat)

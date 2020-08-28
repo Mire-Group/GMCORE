@@ -18,9 +18,20 @@ module process_mod
   public proc
   public is_root_proc
 
+  public decomp_1d
+  public decomp_2d_simple
+  public decomp_reduce_south_region
+  public decomp_reduce_south_boundary
+  public decomp_reduce_north_region
+  public decomp_reduce_north_boundary
+  public decomp_normal_region
+  public decomp_normal_south_boundary
+  public decomp_normal_north_boundary
+
   type process_neighbor_type
-    integer :: id = MPI_PROC_NULL
-    integer :: orient = 0
+    integer :: id       = MPI_PROC_NULL ! ID in global comm
+    integer :: local_id = MPI_PROC_NULL ! ID in local comm
+    integer :: orient   = 0
     integer :: lon_ibeg = inf_i4
     integer :: lon_iend = inf_i4
     integer :: lat_ibeg = inf_i4
@@ -29,19 +40,45 @@ module process_mod
     procedure :: init => process_neighbor_init
   end type process_neighbor_type
 
+  integer, parameter :: decomp_1d = 1
+  integer, parameter :: decomp_2d_simple = 2
+
+  integer, parameter :: decomp_reduce_south_region   = 1
+  integer, parameter :: decomp_reduce_south_boundary = 2
+  integer, parameter :: decomp_reduce_north_region   = 3
+  integer, parameter :: decomp_reduce_north_boundary = 4
+  integer, parameter :: decomp_normal_region         = 5
+  integer, parameter :: decomp_normal_south_boundary = 6
+  integer, parameter :: decomp_normal_north_boundary = 7
+
   type process_type
-    integer comm
-    integer group
-    integer :: zonal_comm = MPI_COMM_NULL
-    integer :: zonal_group = MPI_GROUP_NULL
-    integer cart_dims(2)
-    integer cart_coords(2)
-    integer id                                         ! MPI process ID
+    integer :: comm           = MPI_COMM_NULL
+    integer :: local_comm     = MPI_COMM_NULL
+    integer :: zonal_comm     = MPI_COMM_NULL
+    integer :: group          = MPI_GROUP_NULL
+    integer :: local_group    = MPI_GROUP_NULL
+    integer :: zonal_group    = MPI_GROUP_NULL
+    integer :: cart_dims(2)   = 0
+    integer :: cart_coords(2) = 0
+    integer :: id             = MPI_PROC_NULL          ! ID in global comm
+    integer :: local_id       = MPI_PROC_NULL          ! ID in local comm
     integer idom                                       ! Nest domain index (root domain is 1)
+    integer num_lon                                    ! Grid size along longitude
+    integer num_lat                                    ! Grid size along latitude
     integer lon_ibeg                                   ! Index of beginning longitude grid
     integer lon_iend                                   ! Index of ending longitude grid
     integer lat_ibeg                                   ! Index of beginning latitude grid
     integer lat_iend                                   ! Index of ending latitude grid
+
+    ! Working variables
+    integer decomp_type
+    integer decomp_loc
+    integer np
+    integer np_lon
+    integer np_lat
+    integer :: nd = 0
+    integer :: nd2 = 0
+
     type(process_neighbor_type), allocatable :: ngb(:) ! Neighbor processes
     type(block_type), allocatable :: blocks(:)
   end type process_type
@@ -52,12 +89,15 @@ contains
 
   subroutine process_init()
 
-    integer num_total_lon, num_total_lat
+    integer ierr
 
-    call setup_mpi()
-    call decompose_domains(proc%idom, proc%cart_dims, proc%cart_coords, num_total_lon, num_total_lat, &
-                           proc%lon_ibeg, proc%lon_iend, proc%lat_ibeg, proc%lat_iend)
-    call setup_zonal_comm_for_reduce(num_total_lat, proc%lat_ibeg, proc%lat_iend)
+    call MPI_INIT(ierr)
+    proc%comm = MPI_COMM_WORLD
+    call MPI_COMM_GROUP(proc%comm, proc%group, ierr)
+
+    call setup_mpi_2d()
+    call decompose_domains()
+    call setup_zonal_comm_for_reduce()
     call connect_parent() ! <-- FIXME: Needs implementation.
 
   end subroutine process_init
@@ -76,8 +116,11 @@ contains
 
     integer ierr
 
+    if (allocated(proc%ngb   )) deallocate(proc%ngb   )
     if (allocated(proc%blocks)) deallocate(proc%blocks)
-    if (proc%group /= MPI_GROUP_NULL) call MPI_GROUP_FREE(proc%group, ierr)
+    if (proc%group       /= MPI_GROUP_NULL) call MPI_GROUP_FREE(proc%group      , ierr)
+    if (proc%local_group /= MPI_GROUP_NULL) call MPI_GROUP_FREE(proc%local_group, ierr)
+    if (proc%zonal_group /= MPI_GROUP_NULL) call MPI_GROUP_FREE(proc%zonal_group, ierr)
 
     call MPI_FINALIZE(ierr)
 
@@ -89,15 +132,16 @@ contains
 
   end function is_root_proc
 
-  subroutine setup_mpi()
+  subroutine setup_mpi_1d()
 
-    integer ierr, np, np2, pid, tmp_comm, i
+    integer ierr, np2, tmp_comm, tmp_id(1), i
     logical periods(2)
 
-    call MPI_INIT(ierr)
-    ! Get basic MPI information.
-    call MPI_COMM_SIZE(MPI_COMM_WORLD, np, ierr)
-    call MPI_COMM_RANK(MPI_COMM_WORLD, pid, ierr)
+    call MPI_COMM_SIZE(proc%comm, proc%np, ierr)
+    call MPI_COMM_RANK(proc%comm, proc%id, ierr)
+
+    proc%decomp_type = decomp_1d
+    proc%decomp_loc  = decomp_normal_region
 
     if (num_proc_lon(1) /= 0 .and. num_proc_lat(1) /= 0) then
       ! Check if process topology in namelist is compatible with MPI runtime.
@@ -105,14 +149,14 @@ contains
       do i = 1, nest_max_dom
         np2 = np2 + num_proc_lon(i) * num_proc_lat(i)
       end do
-      if (np /= np2 .and. pid == 0) then
+      if (proc%np /= np2 .and. proc%id == 0) then
         call log_error('Namelist num_proc_lon and num_proc_lat are not compatible with MPI runtime!')
       end if
       ! Set the process topology into proc object.
       np2 = 0
       do i = 1, nest_max_dom
         np2 = np2 + num_proc_lon(i) * num_proc_lat(i)
-        if (pid + 1 <= np2) then
+        if (proc%id + 1 <= np2) then
           proc%cart_dims(1) = num_proc_lon(i)
           proc%cart_dims(2) = num_proc_lat(i)
           proc%idom = i
@@ -121,147 +165,297 @@ contains
       end do
     else
       proc%cart_dims = 0
-      call MPI_DIMS_CREATE(np, 2, proc%cart_dims, ierr)
+      call MPI_DIMS_CREATE(proc%np, 2, proc%cart_dims, ierr)
     end if
     periods = [.true.,.false.]
     if (proc%idom > 1 .and. (nest_lon_beg(proc%idom) /= 0 .or. nest_lon_end(proc%idom) /= 360)) then
       periods(1) = .false.
     end if
     ! Set MPI process topology.
-    ! - Create new communicator for each domain.
-    call MPI_COMM_SPLIT(MPI_COMM_WORLD, proc%idom, pid, tmp_comm, ierr)
-    call MPI_CART_CREATE(tmp_comm, 2, proc%cart_dims, periods, .true., proc%comm, ierr)
-    call MPI_COMM_GROUP(proc%comm, proc%group, ierr)
-    ! - Get the basic information and neighborhood.
-    if (allocated(proc%ngb)) deallocate(proc%ngb)
-    allocate(proc%ngb(4))
-    call proc%ngb(west )%init(west , lat_ibeg=proc%lat_ibeg, lat_iend=proc%lat_iend)
-    call proc%ngb(east )%init(east , lat_ibeg=proc%lat_ibeg, lat_iend=proc%lat_iend)
-    call proc%ngb(south)%init(south, lon_ibeg=proc%lon_ibeg, lon_iend=proc%lon_ibeg)
-    call proc%ngb(north)%init(north, lon_ibeg=proc%lon_ibeg, lon_iend=proc%lon_ibeg)
-    call MPI_COMM_RANK(proc%comm, proc%id, ierr)
-    call MPI_CART_COORDS(proc%comm, proc%id, 2, proc%cart_coords, ierr)
-    call MPI_CART_SHIFT(proc%comm, 0, 1, proc%ngb(1)%id, proc%ngb(2)%id, ierr)
-    call MPI_CART_SHIFT(proc%comm, 1, 1, proc%ngb(3)%id, proc%ngb(4)%id, ierr)
+    call MPI_COMM_SPLIT(proc%comm, proc%idom, proc%id, tmp_comm, ierr)
+    call MPI_CART_CREATE(tmp_comm, 2, proc%cart_dims, periods, .true., proc%local_comm, ierr)
     call MPI_COMM_FREE(tmp_comm, ierr)
+    call MPI_COMM_GROUP(proc%local_comm, proc%local_group, ierr)
+    call MPI_COMM_RANK(proc%local_comm, proc%local_id, ierr)
+    call MPI_CART_COORDS(proc%local_comm, proc%local_id, 2, proc%cart_coords, ierr)
 
-  end subroutine setup_mpi
+  end subroutine setup_mpi_1d
 
-  subroutine decompose_domains(idom, cart_dims, cart_coords, num_total_lon, num_total_lat, lon_ibeg, lon_iend, lat_ibeg, lat_iend)
+  subroutine setup_mpi_2d()
 
-    integer, intent(in ) :: idom
-    integer, intent(in ) :: cart_dims(2)
-    integer, intent(in ) :: cart_coords(2)
-    integer, intent(out) :: num_total_lon
-    integer, intent(out) :: num_total_lat
-    integer, intent(out) :: lon_ibeg
-    integer, intent(out) :: lon_iend
-    integer, intent(out) :: lat_ibeg
-    integer, intent(out) :: lat_iend
+    integer ierr, tag, tmp_comm, np_2d, i
+    logical periods(2)
 
-    integer ierr, i, j
+    call MPI_COMM_SIZE(proc%comm, proc%np, ierr)
+    call MPI_COMM_RANK(proc%comm, proc%id, ierr)
+
+    proc%nd = count(reduce_factors > 1)
+    ! If nd is odd, just use 1D decomposition.
+    np_2d = proc%np - proc%nd
+    if (np_2d <= 0 .or. mod(proc%nd, 2) /= 0) then
+      proc%nd = 0
+      call setup_mpi_1d()
+      return
+    end if
+    proc%nd2 = proc%nd / 2
+    ! Each process in reduce region gets two zonal circles.
+
+    proc%decomp_type = decomp_2d_simple
+
+    if (.false.) then ! For nesting
+    else
+      ! Separate processes for reduce regions and for normal regions.
+      ! In reduce region, we use 1D merdional decomposition.
+      ! In normal region, we use 2D Cartesian decomposition.
+      if (proc%id < proc%nd2) then
+        tag = 1
+        proc%decomp_loc = decomp_reduce_south_region
+        if (proc%id == proc%nd2 - 1) proc%decomp_loc = decomp_reduce_south_boundary
+        proc%cart_dims = [1, proc%nd2]
+      else if (proc%id >= proc%np - proc%nd2) then
+        tag = 2
+        proc%decomp_loc = decomp_reduce_north_region
+        if (proc%id == proc%np - proc%nd2) proc%decomp_loc = decomp_reduce_north_boundary
+        proc%cart_dims = [1, proc%nd2]
+      else
+        tag = 3
+        proc%decomp_loc = decomp_normal_region
+        call MPI_DIMS_CREATE(np_2d, 2, proc%cart_dims, ierr)
+        proc%np_lon = proc%cart_dims(1)
+        proc%np_lat = proc%cart_dims(2)
+      end if
+      ! Let processes in reduce region know the decomposition in normal region.
+      call MPI_BCAST(proc%np_lon, 1, MPI_INT, proc%nd2, proc%comm, ierr)
+      call MPI_BCAST(proc%np_lat, 1, MPI_INT, proc%nd2, proc%comm, ierr)
+      periods = [.true.,.false.]
+    end if
+
+    call MPI_COMM_SPLIT(proc%comm, tag, proc%id, tmp_comm, ierr)
+    call MPI_CART_CREATE(tmp_comm, 2, proc%cart_dims, periods, .true., proc%local_comm, ierr)
+    call MPI_COMM_FREE(tmp_comm, ierr)
+    call MPI_COMM_GROUP(proc%local_comm, proc%local_group, ierr)
+    call MPI_COMM_RANK(proc%local_comm, proc%local_id, ierr)
+    call MPI_CART_COORDS(proc%local_comm, proc%local_id, 2, proc%cart_coords, ierr)
+
+    if (proc%decomp_loc == decomp_normal_region) then
+      if (proc%cart_coords(2) == 0) then
+        proc%decomp_loc = decomp_normal_south_boundary
+      else if (proc%cart_coords(2) == proc%cart_dims(2) - 1) then
+        proc%decomp_loc = decomp_normal_north_boundary
+      end if
+    end if
+
+  end subroutine setup_mpi_2d
+
+  subroutine decompose_domains()
+
+    integer ierr, status(MPI_STATUS_SIZE), i, j, tmp_id(1)
+    integer ngb_lon_ibeg, ngb_lon_iend
     integer num_lon, num_lat, res_num
 
-    if (idom > 1) then
+    ! Set neighborhood.
+    if (allocated(proc%ngb)) deallocate(proc%ngb)
+    select case (proc%decomp_loc)
+    case (decomp_normal_region, decomp_normal_south_boundary, decomp_normal_north_boundary)
+      allocate(proc%ngb(4))
+      call MPI_CART_SHIFT(proc%local_comm, 0, 1, proc%ngb(west )%local_id, proc%ngb(east )%local_id, ierr)
+      call MPI_CART_SHIFT(proc%local_comm, 1, 1, proc%ngb(south)%local_id, proc%ngb(north)%local_id, ierr)
+      if (proc%ngb(south)%local_id == MPI_PROC_NULL .and. proc%nd2 /= 0) then
+        proc%ngb(south)%id = proc%nd2 - 1
+      end if
+      if (proc%ngb(north)%local_id == MPI_PROC_NULL .and. proc%nd2 /= 0) then
+        proc%ngb(north)%id = proc%np - proc%nd2
+      end if
+    case (decomp_reduce_south_region, decomp_reduce_north_region)
+      allocate(proc%ngb(4))
+      call MPI_CART_SHIFT(proc%local_comm, 0, 1, proc%ngb(west )%local_id, proc%ngb(east )%local_id, ierr)
+      call MPI_CART_SHIFT(proc%local_comm, 1, 1, proc%ngb(south)%local_id, proc%ngb(north)%local_id, ierr)
+    case (decomp_reduce_south_boundary)
+      allocate(proc%ngb(3 + proc%np_lon))
+      call MPI_CART_SHIFT(proc%local_comm, 0, 1, proc%ngb(west )%local_id, proc%ngb(east )%local_id, ierr)
+      call MPI_CART_SHIFT(proc%local_comm, 1, 1, proc%ngb(south)%local_id, proc%ngb(north)%local_id, ierr)
+      ! Set neighbors from normal region mannually.
+      do i = 1, proc%np_lon
+        proc%ngb(3+i)%id = proc%nd2 + (i - 1) * proc%np_lat
+      end do
+    case (decomp_reduce_north_boundary)
+      allocate(proc%ngb(3 + proc%np_lon))
+      call MPI_CART_SHIFT(proc%local_comm, 0, 1, proc%ngb(west )%local_id, proc%ngb(east )%local_id, ierr)
+      call MPI_CART_SHIFT(proc%local_comm, 1, 1, proc%ngb(south)%local_id, proc%ngb(north)%local_id, ierr)
+      ! Set neighbors from normal region mannually.
+      proc%ngb(south)%id = proc%np - proc%nd2 - proc%np_lon * proc%np_lat + 1
+      do i = 2, proc%np_lon
+        proc%ngb(3+i)%id = proc%ngb(south)%id + (i - 1) * proc%np_lat
+      end do
+    end select
+
+    ! Translate local ID of neighbors to global ID.
+    do i = 1, size(proc%ngb)
+      if (proc%ngb(i)%id == MPI_PROC_NULL) then
+        call MPI_GROUP_TRANSLATE_RANKS(proc%local_group, 1, [proc%ngb(i)%local_id], proc%group, tmp_id, ierr)
+        proc%ngb(i)%id = tmp_id(1)
+      end if
+    end do
+
+    ! Set initial values for num_lon, num_lat, lon_ibeg, lat_ibeg.
+    proc%num_lon = global_mesh%num_full_lon
+    proc%lon_ibeg = 1
+    proc%lat_ibeg = 1
+    select case (proc%decomp_loc)
+    case (decomp_reduce_south_region, decomp_reduce_south_boundary)
+      proc%num_lat  = proc%nd
+    case (decomp_reduce_north_region, decomp_reduce_north_boundary)
+      proc%num_lat  = proc%nd
+#ifdef V_POLE
+      proc%lat_ibeg = global_mesh%num_half_lat - proc%nd + 1
+#else
+      proc%lat_ibeg = global_mesh%num_full_lat - proc%nd + 1
+#endif
+    case (decomp_normal_region, decomp_normal_south_boundary, decomp_normal_north_boundary)
+#ifdef V_POLE
+      proc%num_lat = global_mesh%num_half_lat - 2 * proc%nd
+#else
+      proc%num_lat = global_mesh%num_full_lat - 2 * proc%nd
+#endif
+    end select
+
+    if (proc%idom > 1) then ! For nesting
       ! Get the start and end indices according to nest domain range.
       ! Zonal direction
-      lon_ibeg = 0; lon_iend = 0
+      proc%lon_ibeg = 0; proc%lon_iend = 0
       do i = 1, global_mesh%num_full_lon
-        if (global_mesh%full_lon_deg(i) >= nest_lon_beg(idom-1)) then
-          lon_ibeg = i
+        if (global_mesh%full_lon_deg(i) >= nest_lon_beg(proc%idom-1)) then
+          proc%lon_ibeg = i
           exit
         end if
       end do
       do i = 1, global_mesh%num_full_lon
-        if (global_mesh%full_lon_deg(i) >= nest_lon_end(idom-1)) then
-          lon_iend = i
+        if (global_mesh%full_lon_deg(i) >= nest_lon_end(proc%idom-1)) then
+          proc%lon_iend = i
           exit
         end if
       end do
-      if (lon_iend == 0) lon_iend = global_mesh%num_full_lon
-      num_total_lon = lon_iend - lon_ibeg + 1
+      if (proc%lon_iend == 0) proc%lon_iend = global_mesh%num_full_lon
+      proc%num_lon = proc%lon_iend - proc%lon_ibeg + 1
       ! Meridional direction
-      lat_ibeg = 0; lat_iend = 0
+      proc%lat_ibeg = 0; proc%lat_iend = 0
 #ifdef V_POLE
       do j = 1, global_mesh%num_half_lat
-        if (global_mesh%half_lat_deg(j) >= nest_lat_beg(idom-1)) then
-          lat_ibeg = j
+        if (global_mesh%half_lat_deg(j) >= nest_lat_beg(proc%idom-1)) then
+          proc%lat_ibeg = j
           exit
         end if
       end do
       do j = 1, global_mesh%num_half_lat
-        if (global_mesh%half_lat_deg(j) >= nest_lat_end(idom-1)) then
-          lat_iend = j
+        if (global_mesh%half_lat_deg(j) >= nest_lat_end(proc%idom-1)) then
+          proc%lat_iend = j
           exit
         end if
       end do
-      if (lat_iend == 0) lat_iend = global_mesh%num_full_lat
+      if (proc%lat_iend == 0) proc%lat_iend = global_mesh%num_full_lat
 #else
       do j = 1, global_mesh%num_full_lat
-        if (global_mesh%full_lat_deg(j) >= nest_lat_beg(idom-1)) then
-          lat_ibeg = j
+        if (global_mesh%full_lat_deg(j) >= nest_lat_beg(proc%idom-1)) then
+          proc%lat_ibeg = j
           exit
         end if
       end do
       do j = 1, global_mesh%num_full_lat
-        if (global_mesh%full_lat_deg(j) >= nest_lat_end(idom-1)) then
-          lat_iend = j
+        if (global_mesh%full_lat_deg(j) >= nest_lat_end(proc%idom-1)) then
+          proc%lat_iend = j
           exit
         end if
       end do
-      if (lat_iend == 0) lat_iend = global_mesh%num_full_lat
+      if (proc%lat_iend == 0) proc%lat_iend = global_mesh%num_full_lat
 #endif
-      num_total_lat = lat_iend - lat_ibeg + 1
-    else
-      lon_ibeg = 1
-      lat_ibeg = 1
-      num_total_lon = global_mesh%num_full_lon
-#ifdef V_POLE
-      num_total_lat = global_mesh%num_half_lat
-#else
-      num_total_lat = global_mesh%num_full_lat
-#endif
+      proc%num_lat = proc%lat_iend - proc%lat_ibeg + 1
     end if
 
-    res_num = mod(num_total_lon, cart_dims(1))
-    do i = 0, cart_coords(1) - 1
+    res_num = mod(proc%num_lon, proc%cart_dims(1))
+    do i = 0, proc%cart_coords(1) - 1
       if (res_num /= 0 .and. i < res_num) then
-        num_lon = num_total_lon / cart_dims(1) + 1
+        num_lon = proc%num_lon / proc%cart_dims(1) + 1
       else
-        num_lon = num_total_lon / cart_dims(1)
+        num_lon = proc%num_lon / proc%cart_dims(1)
       end if
-      lon_ibeg = lon_ibeg + num_lon
+      proc%lon_ibeg = proc%lon_ibeg + num_lon
     end do
-    if (res_num /= 0 .and. cart_coords(1) < res_num) then
-      num_lon = num_total_lon / cart_dims(1) + 1
+    if (res_num /= 0 .and. proc%cart_coords(1) < res_num) then
+      num_lon = proc%num_lon / proc%cart_dims(1) + 1
     else
-      num_lon = num_total_lon / cart_dims(1)
+      num_lon = proc%num_lon / proc%cart_dims(1)
     end if
-    lon_iend = lon_ibeg + num_lon - 1
+    proc%num_lon = num_lon
+    proc%lon_iend = proc%lon_ibeg + num_lon - 1
 
-    res_num = mod(num_total_lat, cart_dims(2))
-    do j = 0, cart_coords(2) - 1
+    res_num = mod(proc%num_lat, proc%cart_dims(2))
+    do j = 0, proc%cart_coords(2) - 1
       if (res_num /= 0 .and. j < res_num) then
-        num_lat = num_total_lat / cart_dims(2) + 1
+        num_lat = proc%num_lat / proc%cart_dims(2) + 1
       else
-        num_lat = num_total_lat / cart_dims(2)
+        num_lat = proc%num_lat / proc%cart_dims(2)
       end if
-      lat_ibeg = lat_ibeg + num_lat
+      proc%lat_ibeg = proc%lat_ibeg + num_lat
     end do
-    if (res_num /= 0 .and. cart_coords(2) < res_num) then
-      num_lat = num_total_lat / cart_dims(2) + 1
+    if (res_num /= 0 .and. proc%cart_coords(2) < res_num) then
+      num_lat = proc%num_lat / proc%cart_dims(2) + 1
     else
-      num_lat = num_total_lat / cart_dims(2)
+      num_lat = proc%num_lat / proc%cart_dims(2)
     end if
-    lat_iend = lat_ibeg + num_lat - 1
+    proc%num_lat = num_lat
+    proc%lat_iend = proc%lat_ibeg + num_lat - 1
+
+    select case (proc%decomp_loc)
+    case (decomp_normal_region)
+      call proc%ngb(west )%init(west , lat_ibeg=proc%lat_ibeg, lat_iend=proc%lat_iend)
+      call proc%ngb(east )%init(east , lat_ibeg=proc%lat_ibeg, lat_iend=proc%lat_iend)
+      call proc%ngb(south)%init(south, lon_ibeg=proc%lon_ibeg, lon_iend=proc%lon_iend)
+      call proc%ngb(north)%init(north, lon_ibeg=proc%lon_ibeg, lon_iend=proc%lon_iend)
+    case (decomp_normal_south_boundary)
+      call proc%ngb(west )%init(west , lat_ibeg=proc%lat_ibeg, lat_iend=proc%lat_iend)
+      call proc%ngb(east )%init(east , lat_ibeg=proc%lat_ibeg, lat_iend=proc%lat_iend)
+      call proc%ngb(south)%init(south, lon_ibeg=proc%lon_ibeg, lon_iend=proc%lon_iend)
+      call proc%ngb(north)%init(north, lon_ibeg=proc%lon_ibeg, lon_iend=proc%lon_iend)
+      call MPI_SEND(proc%lon_ibeg, 1, MPI_INT, proc%ngb(south)%id, 0, proc%comm, ierr)
+      call MPI_SEND(proc%lon_iend, 1, MPI_INT, proc%ngb(south)%id, 1, proc%comm, ierr)
+    case (decomp_normal_north_boundary)
+      call proc%ngb(west )%init(west , lat_ibeg=proc%lat_ibeg, lat_iend=proc%lat_iend)
+      call proc%ngb(east )%init(east , lat_ibeg=proc%lat_ibeg, lat_iend=proc%lat_iend)
+      call proc%ngb(south)%init(south, lon_ibeg=proc%lon_ibeg, lon_iend=proc%lon_iend)
+      call proc%ngb(north)%init(north, lon_ibeg=proc%lon_ibeg, lon_iend=proc%lon_iend)
+      call MPI_SEND(proc%lon_ibeg, 1, MPI_INT, proc%ngb(north)%id, 0, proc%comm, ierr)
+      call MPI_SEND(proc%lon_iend, 1, MPI_INT, proc%ngb(north)%id, 1, proc%comm, ierr)
+    case (decomp_reduce_south_region, decomp_reduce_north_region)
+      call proc%ngb(west )%init(west , lat_ibeg=proc%lat_ibeg, lat_iend=proc%lat_iend)
+      call proc%ngb(east )%init(east , lat_ibeg=proc%lat_ibeg, lat_iend=proc%lat_iend)
+      call proc%ngb(south)%init(south, lon_ibeg=proc%lon_ibeg, lon_iend=proc%lon_iend)
+      call proc%ngb(north)%init(north, lon_ibeg=proc%lon_ibeg, lon_iend=proc%lon_iend)
+    case (decomp_reduce_south_boundary)
+      call proc%ngb(west )%init(west , lat_ibeg=proc%lat_ibeg, lat_iend=proc%lat_iend)
+      call proc%ngb(east )%init(east , lat_ibeg=proc%lat_ibeg, lat_iend=proc%lat_iend)
+      call proc%ngb(south)%init(south, lon_ibeg=proc%lon_ibeg, lon_iend=proc%lon_iend)
+      do i = 1, proc%np_lon
+        call MPI_RECV(ngb_lon_ibeg, 1, MPI_INT, proc%ngb(south+i)%id, 0, proc%comm, status, ierr)
+        call MPI_RECV(ngb_lon_iend, 1, MPI_INT, proc%ngb(south+i)%id, 1, proc%comm, status, ierr)
+        call proc%ngb(south+i)%init(north, lon_ibeg=ngb_lon_ibeg, lon_iend=ngb_lon_iend)
+      end do
+    case (decomp_reduce_north_boundary)
+      call proc%ngb(west )%init(west , lat_ibeg=proc%lat_ibeg, lat_iend=proc%lat_iend)
+      call proc%ngb(east )%init(east , lat_ibeg=proc%lat_ibeg, lat_iend=proc%lat_iend)
+      call proc%ngb(north)%init(north, lon_ibeg=proc%lon_ibeg, lon_iend=proc%lon_iend)
+      call MPI_RECV(ngb_lon_ibeg, 1, MPI_INT, proc%ngb(south)%id, 0, proc%comm, status, ierr)
+      call MPI_RECV(ngb_lon_iend, 1, MPI_INT, proc%ngb(south)%id, 1, proc%comm, status, ierr)
+      call proc%ngb(south)%init(south, lon_ibeg=ngb_lon_ibeg, lon_iend=ngb_lon_iend)
+      do i = 2, proc%np_lon
+        call MPI_RECV(ngb_lon_ibeg, 1, MPI_INT, proc%ngb(south+i)%id, 0, proc%comm, status, ierr)
+        call MPI_RECV(ngb_lon_iend, 1, MPI_INT, proc%ngb(south+i)%id, 1, proc%comm, status, ierr)
+        call proc%ngb(south+i)%init(south, lon_ibeg=ngb_lon_ibeg, lon_iend=ngb_lon_iend)
+      end do
+    end select
 
   end subroutine decompose_domains
 
-  subroutine setup_zonal_comm_for_reduce(num_total_lat, lat_ibeg, lat_iend)
-
-    integer, intent(in) :: num_total_lat
-    integer, intent(in) :: lat_ibeg
-    integer, intent(in) :: lat_iend
+  subroutine setup_zonal_comm_for_reduce()
 
     integer ierr, i, j, jr
     integer, allocatable :: zonal_proc_id(:)
@@ -276,15 +470,19 @@ contains
           exit
         end if
       end do
-      if (global_mesh%is_south_pole(lat_ibeg) .or. global_mesh%is_north_pole(lat_iend) .or. &
-          lat_ibeg <= jr .or. lat_iend > num_total_lat - jr) then
+      if (global_mesh%is_south_pole(proc%lat_ibeg) .or. global_mesh%is_north_pole(proc%lat_iend) .or. &
+#ifdef V_POLE
+          proc%lat_ibeg <= jr .or. proc%lat_iend > global_mesh%num_half_lat - jr) then
+#else
+          proc%lat_ibeg <= jr .or. proc%lat_iend > global_mesh%num_full_lat - jr) then
+#endif
         call log_notice('Create zonal communicator on process ' // to_string(proc%id) // '.')
         allocate(zonal_proc_id(proc%cart_dims(1)))
         do i = 1, proc%cart_dims(1)
-          call MPI_CART_RANK(proc%comm, [i-1,proc%cart_coords(2)], zonal_proc_id(i), ierr)
+          call MPI_CART_RANK(proc%local_comm, [i-1,proc%cart_coords(2)], zonal_proc_id(i), ierr)
         end do
-        call MPI_GROUP_INCL(proc%group, size(zonal_proc_id), zonal_proc_id, proc%zonal_group, ierr)
-        call MPI_COMM_CREATE_GROUP(proc%comm, proc%zonal_group, sum(zonal_proc_id), proc%zonal_comm, ierr)
+        call MPI_GROUP_INCL(proc%local_group, size(zonal_proc_id), zonal_proc_id, proc%zonal_group, ierr)
+        call MPI_COMM_CREATE_GROUP(proc%local_comm, proc%zonal_group, sum(zonal_proc_id), proc%zonal_comm, ierr)
         deallocate(zonal_proc_id)
       end if
     end if
@@ -293,59 +491,11 @@ contains
 
   subroutine connect_parent()
 
-    integer parent_idom, parent_cart_dims(2)
-    integer lon_halo_width, lat_halo_width
-    integer num_total_lon, num_total_lat
-    integer parent_lon_ibeg, parent_lon_iend
-    integer parent_lat_ibeg, parent_lat_iend
-    integer i, j
-
-    !  ____________________________________________________________________________
-    ! |          |          |          |          |          |          |          |
-    ! |          |          |          |          |          |          |          |
-    ! |          |          |          |          |          |          |          |
-    ! |          |          |          |          |          |          |          |
-    ! |__________|__________|__________|__________|__________|__________|__________|
-    ! |          |      ____|\\\\\\\\\\|____      |          |          |          |
-    ! |          |     |    |\|\\\\\\|\|    |     |          |          |          |
-    ! |          |     |    |\|\\\\\\|\|    |     |          |          |          |
-    ! |          |     |____|\|\\\\\\|\|____|     |          |          |          |
-    ! |__________|_____|____|\|//////|\|____|_____|__________|__________|__________|
-    ! |          |     |    |\|//////|\|    |     |          |          |          |
-    ! |          |     |____|\|//////|\|____|     |          |          |          |
-    ! |          |          |\\\\\\\\\\|          |          |          |          |
-    ! |          |          |\\\\\\\\\\|          |          |          |          |
-    ! |__________|__________|\\\\\\\\\\|__________|__________|__________|__________|
-    !
-    ! //////                \\\\\\
-    ! ////// - child domain \\\\\\ - parent domain
-    ! //////                \\\\\\
-
-    if (proc%idom > 1) then ! Only child processes needs to care about.
-      parent_idom = proc%idom - 1
-      parent_cart_dims = [num_proc_lon(parent_idom),num_proc_lat(parent_idom)]
-      lon_halo_width = 1
-      lat_halo_width = 1
-      do j = 0, num_proc_lat(parent_idom) - 1
-        do i = 0, num_proc_lon(parent_idom) - 1
-          call decompose_domains(parent_idom, parent_cart_dims, [i,j], num_total_lon, num_total_lat, &
-                                 parent_lon_ibeg, parent_lon_iend, parent_lat_ibeg, parent_lat_iend)
-          if (((proc%lon_ibeg - lon_halo_width <= parent_lon_ibeg .and. parent_lon_ibeg <= proc%lon_iend + lon_halo_width)   .or. &
-               (proc%lon_ibeg - lon_halo_width <= parent_lon_iend .and. parent_lon_iend <= proc%lon_iend + lon_halo_width)) .and. &
-              ((proc%lat_ibeg - lat_halo_width <= parent_lat_ibeg .and. parent_lat_ibeg <= proc%lat_iend + lat_halo_width)   .or. &
-               (proc%lat_ibeg - lat_halo_width <= parent_lat_iend .and. parent_lat_iend <= proc%lat_iend + lat_halo_width))) then
-            print *, proc%id, proc%cart_coords, i, j, parent_lon_ibeg, parent_lon_iend, proc%lon_ibeg - lon_halo_width, proc%lon_iend + lon_halo_width, &
-                                                      parent_lat_ibeg, parent_lat_iend, proc%lat_ibeg - lat_halo_width, proc%lat_iend + lat_halo_width
-          end if
-        end do
-      end do
-    end if
-
   end subroutine connect_parent
 
   subroutine process_create_blocks()
 
-    integer ingb, dtype
+    integer i, dtype
 
     if (.not. allocated(proc%blocks)) allocate(proc%blocks(1))
 
@@ -365,9 +515,15 @@ contains
 
     ! Setup halos (only normal halos for the time being).
     allocate(proc%blocks(1)%halo(size(proc%ngb)))
-    do ingb = 1, size(proc%ngb)
-      call proc%blocks(1)%halo(ingb)%init_normal(proc%blocks(1)%mesh, proc%ngb(ingb)%orient, &
-                                                 dtype, ngb_proc_id=proc%ngb(ingb)%id)
+    do i = 1, size(proc%ngb)
+      select case (proc%ngb(i)%orient)
+      case (west, east)
+        call proc%blocks(1)%halo(i)%init(proc%blocks(1)%mesh, proc%ngb(i)%orient, dtype, ngb_proc_id=proc%ngb(i)%id, &
+                                         global_lat_ibeg=proc%ngb(i)%lat_ibeg, global_lat_iend=proc%ngb(i)%lat_iend, proc_id=proc%id)
+      case (south, north)
+        call proc%blocks(1)%halo(i)%init(proc%blocks(1)%mesh, proc%ngb(i)%orient, dtype, ngb_proc_id=proc%ngb(i)%id, &
+                                         global_lon_ibeg=proc%ngb(i)%lon_ibeg, global_lon_iend=proc%ngb(i)%lon_iend, proc_id=proc%id)
+      end select
     end do
 
   end subroutine process_create_blocks
