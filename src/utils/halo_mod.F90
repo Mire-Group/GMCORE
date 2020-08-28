@@ -200,7 +200,7 @@ contains
         !send_subarray_start(:,1,2) = [mesh%num_full_lon                    ,mesh%lat_halo_width,0]
         !recv_subarray_start(:,1,2) = [mesh%num_full_lon+mesh%lon_halo_width,mesh%lat_halo_width,0]
 
-        send_subarray_size (:,1,2) = [mesh%lon_halo_width,lat_iend-lat_ibeg+1,num_lev(k)]
+        send_subarray_size (:,1,2) = [mesh%lon_halo_width,lat_iend-lat_ibeg,num_lev(k)]
         recv_subarray_size (:,1,2) = send_subarray_size(:,1,2)
         send_subarray_start(:,1,2) = [mesh%num_full_lon                    ,lat_ibeg,0]
         recv_subarray_start(:,1,2) = [mesh%num_full_lon+mesh%lon_halo_width,lat_ibeg,0]
