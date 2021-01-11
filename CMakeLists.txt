@@ -113,6 +113,7 @@ set(gmcore_files
   src/core/pgf/pgf_swm_mod.F90
   src/core/pgf/pgf_sb81_mod.F90
   src/core/pgf/pgf_lin97_mod.F90
+  src/core/pgf/pgf_dflx_mod.F90
   src/core/mesh_mod.F90
   src/core/vert_coord/sigma_coord_mod.F90
   src/core/vert_coord/hybrid_coord_test_mod.F90
@@ -127,6 +128,7 @@ set(gmcore_files
   src/core/tend_mod.F90
   src/core/pv_mod.F90
   src/core/ke_mod.F90
+  src/core/nh_mod.F90
   src/core/interp_mod.F90
   src/core/operators_mod.F90
   src/core/reduced_types_mod.F90
@@ -151,6 +153,7 @@ set(gmcore_files
   src/tests/mountain_wave_test_mod.F90
   src/tests/baroclinic_wave_test_mod.F90
   src/tests/held_suarez_test_mod.F90
+  src/tests/steady_state_pgf_test_mod.F90
   lib/quadpack.f90
 )
 

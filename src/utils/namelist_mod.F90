@@ -23,6 +23,7 @@ module namelist_mod
 
   logical :: baroclinic = .false.
   logical :: hydrostatic = .true.
+  logical :: nonhydrostatic = .false.
 
   integer :: num_proc_lon(20) = 0
   integer :: num_proc_lat(20) = 0
@@ -57,7 +58,7 @@ module namelist_mod
   ! Damping settings
   logical :: use_polar_damp = .false.
   integer :: polar_damp_order = 4
-  integer :: polar_damp_cycles = 1
+  real(r8) :: polar_damp_lat0 = 80.0_r8
   logical :: use_div_damp = .false.
   integer :: div_damp_order = 2
   integer :: div_damp_j0 = 0
@@ -68,7 +69,7 @@ module namelist_mod
   real(r8) :: div_damp_coef4 = 0.01_r8
   logical :: use_vor_damp = .false.
   integer :: vor_damp_order = 2
-  real(r8) :: vor_damp_lat0 = 50.0_r8
+  real(r8) :: vor_damp_lat0 = 70.0_r8
   real(r8) :: vor_damp_decay = 0.2_r8
   real(r8) :: vor_damp_coef2 = 0.001_r8
   real(r8) :: vor_damp_coef4 = 0.01_r8
@@ -92,7 +93,7 @@ module namelist_mod
     num_lon                   , &
     num_lat                   , &
     num_lev                   , &
-    hydrostatic               , &
+    nonhydrostatic            , &
     num_proc_lon              , &
     num_proc_lat              , &
     start_time                , &
@@ -127,7 +128,7 @@ module namelist_mod
     do_reduce_ke              , &
     use_polar_damp            , &
     polar_damp_order          , &
-    polar_damp_cycles         , &
+    polar_damp_lat0           , &
     use_div_damp              , &
     div_damp_order            , &
     div_damp_polar            , &
@@ -162,33 +163,45 @@ contains
     read(10, nml=gmcore_control)
     close(10)
 
+    hydrostatic = .not. nonhydrostatic
+
   end subroutine parse_namelist
 
   subroutine print_namelist()
 
-    write(*, *) '=================== GMCORE Parameters ==================='
-    write(*, *) 'num_lon             = ', to_str(num_lon)
-    write(*, *) 'num_lat             = ', to_str(num_lat)
-    write(*, *) 'num_lev             = ', to_str(num_lev)
-    write(*, *) 'vert_coord_scheme   = ', trim(vert_coord_scheme)
-    write(*, *) 'vert_coord_template = ', trim(vert_coord_template)
-    write(*, *) 'dt_in_seconds       = ', to_str(int(dt_in_seconds))
-    write(*, *) 'pgf_scheme          = ', trim(pgf_scheme)
-    write(*, *) 'ke_scheme           = ', to_str(ke_scheme)
-    write(*, *) 'pv_scheme           = ', to_str(pv_scheme)
-    write(*, *) 'pv_pole_stokes      = ', to_str(pv_pole_stokes)
-    write(*, *) 'time_scheme         = ', trim(time_scheme)
-    write(*, *) 'upwind_order        = ', to_str(upwind_order)
-    write(*, *) 'use_div_damp        = ', to_str(use_div_damp)
-    write(*, *) 'div_damp_coef2      = ', to_str(div_damp_coef2, 3)
-    write(*, *) 'use_vor_damp        = ', to_str(use_vor_damp)
-    write(*, *) 'vor_damp_lat0       = ', to_str(vor_damp_lat0, 1)
-    write(*, *) 'vor_damp_decay      = ', to_str(vor_damp_decay, 1)
-    write(*, *) 'vor_damp_coef2      = ', to_str(vor_damp_coef2, 3)
-    write(*, *) 'use_polar_damp      = ', to_str(use_polar_damp)
-    write(*, *) 'use_rayleigh_damp   = ', to_str(use_rayleigh_damp)
-    write(*, *) 'use_smag_damp       = ', to_str(use_smag_damp)
-    write(*, *) 'smag_damp_coef      = ', to_str(smag_damp_coef, 1)
+      write(*, *) '=================== GMCORE Parameters ==================='
+      write(*, *) 'num_lon             = ', to_str(num_lon)
+      write(*, *) 'num_lat             = ', to_str(num_lat)
+      write(*, *) 'num_lev             = ', to_str(num_lev)
+      write(*, *) 'hydrostatic         = ', to_str(hydrostatic)
+      write(*, *) 'nonhydrostatic      = ', to_str(nonhydrostatic)
+      write(*, *) 'vert_coord_scheme   = ', trim(vert_coord_scheme)
+      write(*, *) 'vert_coord_template = ', trim(vert_coord_template)
+      write(*, *) 'dt_in_seconds       = ', to_str(int(dt_in_seconds))
+      write(*, *) 'pgf_scheme          = ', trim(pgf_scheme)
+      write(*, *) 'ke_scheme           = ', to_str(ke_scheme)
+      write(*, *) 'pv_scheme           = ', to_str(pv_scheme)
+      write(*, *) 'pv_pole_stokes      = ', to_str(pv_pole_stokes)
+      write(*, *) 'time_scheme         = ', trim(time_scheme)
+      write(*, *) 'upwind_order        = ', to_str(upwind_order)
+      write(*, *) 'reduce_pv_directly  = ', to_str(reduce_pv_directly)
+      write(*, *) 'do_reduce_ke        = ', to_str(do_reduce_ke)
+      write(*, *) 'use_div_damp        = ', to_str(use_div_damp)
+    if (use_div_damp) then
+      write(*, *) 'div_damp_coef2      = ', to_str(div_damp_coef2, 3)
+    end if
+      write(*, *) 'use_vor_damp        = ', to_str(use_vor_damp)
+    if (use_vor_damp) then
+      write(*, *) 'vor_damp_lat0       = ', to_str(vor_damp_lat0, 1)
+      write(*, *) 'vor_damp_decay      = ', to_str(vor_damp_decay, 1)
+      write(*, *) 'vor_damp_coef2      = ', to_str(vor_damp_coef2, 3)
+    end if
+      write(*, *) 'use_polar_damp      = ', to_str(use_polar_damp)
+      write(*, *) 'use_rayleigh_damp   = ', to_str(use_rayleigh_damp)
+      write(*, *) 'use_smag_damp       = ', to_str(use_smag_damp)
+    if (use_smag_damp) then
+      write(*, *) 'smag_damp_coef      = ', to_str(smag_damp_coef, 1)
+    end if
     write(*, *) '========================================================='
 
   end subroutine print_namelist
