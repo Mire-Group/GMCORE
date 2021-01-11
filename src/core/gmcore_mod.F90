@@ -128,7 +128,7 @@ contains
       if (time_step == 0) call cpu_time(time1)
       call cpu_time(time2)
       if (time_step /= 0) then
-        if (is_root_proc()) call log_notice('Time cost ' // to_string(time2 - time1, 5) // ' seconds.')
+        if (is_root_proc()) call log_notice('Time cost ' // to_str(time2 - time1, 5) // ' seconds.')
         time1 = time2
       end if
       if (baroclinic) then
@@ -301,6 +301,8 @@ contains
           end do
         end do
 
+        if (use_rayleigh_damp) call rayleigh_damp_append_tend(block, state, tend)
+
         tend%updated_du   = .true.
         tend%updated_dv   = .true.
         tend%updated_dphs = .true.
@@ -467,8 +469,11 @@ contains
       if (use_polar_damp) then
         call polar_damp_run(blocks(iblk), dt, blocks(iblk)%state(new))
       end if
+      if (use_smag_damp) then
+        call smag_damp_run(blocks(iblk), dt, blocks(iblk)%state(new))
+      end if
       call test_forcing_run(blocks(iblk), dt, blocks(iblk)%state(new))
-      if (use_div_damp .or. use_vor_damp .or. use_vor_damp) then
+      if (use_div_damp .or. use_vor_damp .or. use_polar_damp) then
         call operators_prepare(blocks(iblk), blocks(iblk)%state(new), dt, all_pass)
       end if
     end do

@@ -9,20 +9,15 @@ program gmcore_prepare
   use block_mod
   use vert_coord_mod
   use initial_mod
+  use namelist_mod
 
   implicit none
 
   character(256) namelist_file
   character(256) topo_file
   character(256) bkg_file
-  character(256) initial_file
   character(30) :: bkg_type = 'era5'
   character(30) :: initial_time = '1970-01-01'
-  character(30) :: vert_coord_scheme = 'hybrid'
-  character(30) :: vert_coord_template = 'test_l26'
-  integer num_lon
-  integer num_lat
-  integer num_lev
 
   integer iblk
 
@@ -35,6 +30,8 @@ program gmcore_prepare
     num_lon                      , &
     num_lat                      , &
     num_lev                      , &
+    coarse_polar_lat0            , &
+    coarse_polar_decay           , &
     vert_coord_scheme            , &
     vert_coord_template
 
@@ -45,9 +42,9 @@ program gmcore_prepare
   close(10)
 
   write(*, *) '=================== GMCORE Parameters ==================='
-  write(*, *) 'num_lon              = ', to_string(num_lon)
-  write(*, *) 'num_lat              = ', to_string(num_lat)
-  write(*, *) 'num_lev              = ', to_string(num_lev)
+  write(*, *) 'num_lon              = ', to_str(num_lon)
+  write(*, *) 'num_lat              = ', to_str(num_lat)
+  write(*, *) 'num_lev              = ', to_str(num_lev)
   write(*, *) 'vert_coord_scheme    = ', trim(vert_coord_scheme)
   write(*, *) 'vert_coord_template  = ', trim(vert_coord_template)
   write(*, *) 'initial_time         = ', trim(initial_time)
