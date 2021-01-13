@@ -136,6 +136,8 @@ set(gmcore_files
   src/core/damp/zonal_damp_mod.F90
   src/core/damp/div_damp_mod.F90
   src/core/damp/vor_damp_mod.F90
+  src/core/damp/rayleigh_damp_mod.F90
+  src/core/damp/smag_damp_mod.F90
   src/core/damp/damp_mod.F90
   src/core/gmcore_mod.F90
   src/physics/test_forcing_mod.F90

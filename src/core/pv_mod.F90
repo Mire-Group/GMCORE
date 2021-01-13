@@ -95,7 +95,6 @@ contains
           end do
           call zonal_sum_ensure_order(proc%zonal_comm , order_reduce, pole(k))
         end do
-        !write(*,*) , pole(1)
 #else
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
           do i = mesh%half_lon_ibeg, mesh%half_lon_iend
@@ -103,7 +102,6 @@ contains
           end do
         end do
         call zonal_sum(proc%zonal_comm, pole)
-        !write(*,*) , pole(1)
 #endif
         pole = pole / global_mesh%num_half_lon / mesh%area_vtx(j)
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend

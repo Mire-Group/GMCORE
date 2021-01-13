@@ -58,6 +58,10 @@ module mesh_mod
     real(r8) end_lat
     real(r8) dlon
     real(r8), allocatable, dimension(:  ) :: dlat
+    real(r8), allocatable, dimension(:  ) :: full_dlev
+    real(r8), allocatable, dimension(:  ) :: half_dlev
+    real(r8), allocatable, dimension(:  ) :: half_dlev_upper
+    real(r8), allocatable, dimension(:  ) :: half_dlev_lower
     real(r8) total_area
     real(r8), allocatable, dimension(:  ) :: full_lon
     real(r8), allocatable, dimension(:  ) :: half_lon
@@ -135,7 +139,7 @@ contains
 
     real(r8) dlat0
     real(16) x(3), y(3), z(3)
-    integer i, j
+    integer i, j, j0, jj
 
     this%num_full_lon  = num_lon
     this%num_half_lon  = num_lon
@@ -194,14 +198,24 @@ contains
       if (abs(this%full_lat(j)) < 1.0e-12) this%full_lat(j) = 0.0_r8
     end do
 
-    ! Calculate real dlat which is large at polar region.
-    if (coarse_polar_lats_exp > 0) then
-      this%dlat(1:this%num_full_lat) = exp(                                            &
-        -coarse_polar_lats_exp * (abs(this%full_lat(1:this%num_full_lat)) - pi / 2)**2 &
-      )
-      this%dlat(1:this%num_full_lat) = (                           &
-        1 + coarse_polar_lats_mul * this%dlat(1:this%num_full_lat) &
-      ) / sum(1 + coarse_polar_lats_mul * this%dlat(1:this%num_full_lat)) * pi
+    if (coarse_polar_lat0 /= 0) then
+      ! Calculate real dlat which is large at polar region.
+      j0 = 0
+      do j = 1, this%num_half_lat
+        if (this%half_lat(j) >= -coarse_polar_lat0 * rad) then
+          j0 = j
+          exit
+        end if
+      end do
+      do j = 1, this%num_half_lat
+        if (this%half_lat(j) <= 0) then
+          jj = j - this%half_lat_ibeg_no_pole + 1
+        else
+          jj = this%half_lat_iend_no_pole - j + 1
+        end if
+        this%dlat(j) = dlat0 * (1 + exp(jj**2 * log(coarse_polar_decay) / j0**2))
+      end do
+      this%dlat(1:this%num_half_lat) = this%dlat(1:this%num_half_lat) / sum(this%dlat(1:this%num_half_lat)) * pi
     else
       this%dlat(1:this%num_half_lat) = dlat0
     end if
@@ -232,14 +246,24 @@ contains
       if (abs(this%half_lat(j)) < 1.0e-12) this%half_lat(j) = 0.0_r8
     end do
 
-    ! Calculate real dlat which is large at polar region.
-    if (coarse_polar_lats_exp > 0) then
-      this%dlat(1:this%num_half_lat) = exp(                                            &
-        -coarse_polar_lats_exp * (abs(this%half_lat(1:this%num_half_lat)) - pi / 2)**2 &
-      )
-      this%dlat(1:this%num_half_lat) = (                           &
-        1 + coarse_polar_lats_mul * this%dlat(1:this%num_half_lat) &
-      ) / sum(1 + coarse_polar_lats_mul * this%dlat(1:this%num_half_lat)) * pi
+    if (coarse_polar_lat0 /= 0) then
+      ! Calculate real dlat which is large at polar region.
+      j0 = 0
+      do j = 1, this%num_half_lat
+        if (this%half_lat(j) >= -coarse_polar_lat0 * rad) then
+          j0 = j
+          exit
+        end if
+      end do
+      do j = 1, this%num_half_lat
+        if (this%half_lat(j) <= 0) then
+          jj = j - this%half_lat_ibeg_no_pole + 1
+        else
+          jj = this%half_lat_iend_no_pole - j + 1
+        end if
+        this%dlat(j) = dlat0 * (1 + exp(jj**2 * log(coarse_polar_decay) / j0**2))
+      end do
+      this%dlat(1:this%num_half_lat) = this%dlat(1:this%num_half_lat) / sum(this%dlat(1:this%num_half_lat)) * pi
     else
       this%dlat(1:this%num_half_lat) = dlat0
     end if
@@ -687,6 +711,11 @@ contains
 
     call this%common_init()
 
+    this%full_dlev = parent%full_dlev
+    this%half_dlev = parent%half_dlev
+    this%half_dlev_upper = parent%half_dlev_upper
+    this%half_dlev_lower = parent%half_dlev_lower
+
     this%dlon = parent%dlon
     do i = this%full_lon_lb, this%full_lon_ub
       this%full_lon(i) = parent%full_lon(i)
@@ -775,6 +804,10 @@ contains
 #else
     allocate(this%dlat               (this%half_lat_lb:this%half_lat_ub)); this%dlat                = 0.0_r8
 #endif
+    allocate(this%full_dlev          (this%full_lev_lb:this%full_lev_ub)); this%full_dlev           = 0.0_r8
+    allocate(this%half_dlev          (this%half_lev_lb:this%half_lev_ub)); this%half_dlev           = 0.0_r8
+    allocate(this%half_dlev_upper    (this%half_lev_lb:this%half_lev_ub)); this%half_dlev_upper     = 0.0_r8
+    allocate(this%half_dlev_lower    (this%half_lev_lb:this%half_lev_ub)); this%half_dlev_lower     = 0.0_r8
     allocate(this%full_lon           (this%full_lon_lb:this%full_lon_ub)); this%full_lon            = inf
     allocate(this%half_lon           (this%half_lon_lb:this%half_lon_ub)); this%half_lon            = inf
     allocate(this%full_lat           (this%full_lat_lb:this%full_lat_ub)); this%full_lat            = inf
@@ -912,6 +945,11 @@ contains
 
     type(mesh_type), intent(inout) :: this
 
+		if (allocated(this%dlat            )) deallocate(this%dlat            )
+    if (allocated(this%full_dlev       )) deallocate(this%full_dlev       )
+    if (allocated(this%half_dlev       )) deallocate(this%half_dlev       )
+    if (allocated(this%half_dlev_upper )) deallocate(this%half_dlev_upper )
+    if (allocated(this%half_dlev_lower )) deallocate(this%half_dlev_lower )
     if (allocated(this%full_lon        )) deallocate(this%full_lon        )
     if (allocated(this%full_lat        )) deallocate(this%full_lat        )
     if (allocated(this%full_lev        )) deallocate(this%full_lev        )

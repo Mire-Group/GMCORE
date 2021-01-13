@@ -137,7 +137,7 @@ contains
     proc%decomp_type = decomp_1d_lat
     proc%decomp_loc  = decomp_normal_region
 
-    if (num_proc_lon(1) /= 0 .and. num_proc_lat(1) /= 0) then
+    if (num_proc_lon(1) * num_proc_lat(1) == proc%np) then
       ! Check if process topology in namelist is compatible with MPI runtime.
       np = 0
       do i = 1, nest_max_dom
@@ -160,6 +160,7 @@ contains
       end do
     else
       proc%cart_dims = [1, proc%np]
+      proc%idom = 1
     end if
     periods = [.true.,.false.]
     ! Set MPI process topology.
@@ -241,7 +242,7 @@ contains
 #else
           proc%lat_ibeg <= jr .or. proc%lat_iend > global_mesh%num_full_lat - jr) then
 #endif
-        !call log_notice('Create zonal communicator on process ' // to_string(proc%id) // '.')
+        !call log_notice('Create zonal communicator on process ' // to_str(proc%id) // '.')
         allocate(zonal_proc_id(proc%cart_dims(1)))
         do i = 1, proc%cart_dims(1)
           call MPI_CART_RANK(proc%cart_comm, [i-1,proc%cart_coords(2)], zonal_proc_id(i), ierr)
