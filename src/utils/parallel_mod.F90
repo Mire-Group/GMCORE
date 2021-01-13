@@ -33,6 +33,7 @@ module parallel_mod
   public fill_halo
   public zero_halo
   public zonal_sum
+  public zonal_sum_ensure_order
   public global_sum
   public overlay_inner_halo
   public barrier
@@ -59,6 +60,10 @@ module parallel_mod
     module procedure zonal_sum_0d_r8
     module procedure zonal_sum_1d_r8
   end interface zonal_sum
+
+  interface zonal_sum_ensure_order
+    module procedure zonal_sum_ensure_order_1d_r8
+  end interface zonal_sum_ensure_order
 
   interface global_sum
     module procedure global_sum_0d_r8
@@ -549,6 +554,55 @@ contains
     value = res
 
   end subroutine zonal_sum_1d_r8
+
+  subroutine zonal_sum_ensure_order_1d_r8(comm, value , sum)
+
+    integer, intent(in) :: comm
+    real(8), intent(in) :: value(:)
+    real(8), intent(out):: sum 
+
+    integer status(MPI_STATUS_SIZE), ierr
+    integer numproc 
+    integer i 
+    real(8), allocatable :: allvalue(:)  
+
+
+    call MPI_COMM_SIZE(comm,numproc,ierr)
+    sum = 0.0_r8
+
+    if (numproc == 1) then
+      do i = 1 , size(value)
+        sum = sum + value(i)
+      end do
+    else
+
+      
+      if (proc%cart_coords(1) == 0) then  !root proc
+        !write(*,*) "here root" , proc%id
+        allocate(allvalue(global_mesh%num_full_lon))
+        allvalue(1:size(value)) = value(:)
+        do i = 1 , numproc - 1
+          call MPI_RECV(allvalue( i * size(value) + 1 : (i+1)  * size(value) ) , size(value) , MPI_DOUBLE , i  , 0 , comm , status,ierr)
+        end do
+        do i = 1 , global_mesh%num_full_lon
+          sum = sum + allvalue(i)
+        end do
+        do i = 1 , numproc - 1
+          call MPI_SEND(sum , 1 , MPI_DOUBLE , i , 0 , comm , status,ierr)
+        end do
+        deallocate(allvalue)
+      else !other proc
+        !write(*,*) "here other" , proc%id
+        call MPI_SEND(value(:) , size(value) , MPI_DOUBLE , 0 , 0 , comm , ierr)
+        call MPI_RECV(sum , 1 , MPI_DOUBLE , 0 , 0 , comm , status,ierr)
+      end if  
+
+    end if
+
+    ! call MPI_ALLREDUCE(value, res, size(value), MPI_DOUBLE, MPI_SUM, comm, ierr)
+    ! value = res
+
+  end subroutine zonal_sum_ensure_order_1d_r8
 
   subroutine global_sum_0d_r8(comm, value)
 

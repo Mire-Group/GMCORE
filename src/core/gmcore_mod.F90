@@ -20,6 +20,7 @@ module gmcore_mod
   use pgf_mod
   use damp_mod
   use test_forcing_mod
+  use pa_mod
 
   implicit none
 
@@ -47,17 +48,24 @@ contains
 
     character(10) time_value, time_units
     real(8) seconds
+    type(state_type) :: state
+    type(mesh_type) mesh
+    integer i ,j 
+    real(8) sum
 
+    
     call log_init()
     call global_mesh%init_global(num_lon, num_lat, num_lev, lon_halo_width=max(2, maxval(reduce_factors) - 1), lat_halo_width=2)
     !call debug_check_areas()
     call process_init()
     call vert_coord_init(num_lev, namelist_path)
     call process_create_blocks()
+    call pa_init(proc%comm);
     call time_init()
     call history_init()
     call restart_init()
     call reduce_init(proc%blocks)
+    proc%NeedReduce = proc%blocks(1)%NeedReduce
     call time_scheme_init()
     call pgf_init()
     call damp_init()
@@ -101,6 +109,7 @@ contains
     do while (.not. time_is_finished())
       call time_integrate(dt_in_seconds, proc%blocks)
       if (is_root_proc() .and. time_is_alerted('print')) call log_print_diag(curr_time%isoformat())
+      !if (is_root_proc()) call log_print_diag(curr_time%isoformat())
       call time_advance(dt_in_seconds)
       call operators_prepare(proc%blocks, old, dt_in_seconds)
       call diagnose(proc%blocks, old)

@@ -1,3 +1,5 @@
+!#define Detail_Time
+#define Ensure_Order
 module operators_mod
 
   use const_mod
@@ -14,6 +16,7 @@ module operators_mod
   use interp_mod
   use reduce_mod
   use zonal_damp_mod
+  use pa_mod
 
   implicit none
 
@@ -128,7 +131,17 @@ contains
           end do
         end do
       end do
+
+#ifdef Detail_Time
+  call Get_Start_Time(tran_time_start)
+#endif
+
       call fill_halo(block, state%ph_lev, full_lon=.true., full_lat=.true., full_lev=.false.)
+
+#ifdef Detail_Time
+  call Get_End_Time(tran_time_end)
+  write((10000+myid),*) , 1 , tran_time_end - tran_time_start
+#endif
 
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
         do j = mesh%full_lat_ibeg, mesh%full_lat_iend
@@ -137,7 +150,18 @@ contains
           end do
         end do
       end do
+
+#ifdef Detail_Time
+  call Get_Start_Time(tran_time_start)
+#endif
+
       call fill_halo(block, state%ph, full_lon=.true., full_lat=.true., full_lev=.true.)
+
+#ifdef Detail_Time
+  call Get_End_Time(tran_time_end)
+  write((10000+myid),*) , 2 , tran_time_end - tran_time_start
+#endif
+
     end if
 
   end subroutine calc_ph_lev_ph
@@ -160,7 +184,18 @@ contains
           end do
         end do
       end do
+
+#ifdef Detail_Time
+  call Get_Start_Time(tran_time_start)
+#endif
+
       call fill_halo(block, state%t, full_lon=.true., full_lat=.true., full_lev=.true.)
+
+#ifdef Detail_Time
+  call Get_End_Time(tran_time_end)
+  write((10000+myid),*) , 3 , tran_time_end - tran_time_start
+#endif
+
     end if
 
   end subroutine calc_t
@@ -236,10 +271,21 @@ contains
       ! Set vertical boundary conditions.
       state%wedphdlev(:,:,mesh%half_lev_ibeg) = 0.0_r8
       state%wedphdlev(:,:,mesh%half_lev_iend) = 0.0_r8
+
+#ifdef Detail_Time
+  call Get_Start_Time(tran_time_start)
+#endif
+
 #ifdef V_POLE
       call fill_halo(block, state%wedphdlev, full_lon=.true., full_lat=.true., full_lev=.false., west_halo=.false., north_halo=.false.)
 #else
       call fill_halo(block, state%wedphdlev, full_lon=.true., full_lat=.true., full_lev=.false., west_halo=.false., south_halo=.false.)
+      !call fill_halo(block, state%wedphdlev, full_lon=.true., full_lat=.true., full_lev=.false.)
+#endif
+
+#ifdef Detail_Time
+  call Get_End_Time(tran_time_end)
+  write((10000+myid),*) , 4 , tran_time_end - tran_time_start
 #endif
 
       call interp_cell_to_edge_on_half_level(mesh, state%wedphdlev, state%wedphdlev_lon, state%wedphdlev_lat)
@@ -255,6 +301,8 @@ contains
     type(mesh_type), pointer :: mesh
     real(r8) pole(global_mesh%num_full_lev)
     integer i, j, k
+    real(r8) order_reduce(state%mesh%full_lon_ibeg : state%mesh%full_lon_iend)
+
 
     mesh => state%mesh
 
@@ -279,12 +327,21 @@ contains
     if (mesh%has_south_pole()) then
       j = mesh%full_lat_ibeg
       pole = 0.0_r8
+#ifdef Ensure_Order
+      do k = mesh%full_lev_ibeg, mesh%full_lev_iend
+        do i = mesh%full_lon_ibeg, mesh%full_lon_iend
+          order_reduce(i) = state%v(i,j,k)
+        end do
+        call zonal_sum_ensure_order(proc%zonal_comm , order_reduce, pole(k))
+      end do  
+#else
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
         do i = mesh%full_lon_ibeg, mesh%full_lon_iend
           pole(k) = pole(k) + state%v(i,j,k)
         end do
       end do
       call zonal_sum(proc%zonal_comm, pole)
+#endif
       pole = pole * mesh%le_lat(j) / global_mesh%num_full_lon / mesh%area_cell(j)
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
         do i = mesh%full_lon_ibeg, mesh%full_lon_iend
@@ -295,12 +352,21 @@ contains
     if (mesh%has_north_pole()) then
       j = mesh%full_lat_iend
       pole = 0.0_r8
+#ifdef Ensure_Order
+      do k = mesh%full_lev_ibeg, mesh%full_lev_iend
+        do i = mesh%full_lon_ibeg, mesh%full_lon_iend
+          order_reduce(i) = - state%v(i,j-1,k)
+        end do
+        call zonal_sum_ensure_order(proc%zonal_comm , order_reduce, pole(k))
+      end do 
+#else
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
         do i = mesh%full_lon_ibeg, mesh%full_lon_iend
           pole(k) = pole(k) - state%v(i,j-1,k)
         end do
       end do
       call zonal_sum(proc%zonal_comm, pole)
+#endif
       pole = pole * mesh%le_lat(j-1) / global_mesh%num_full_lon / mesh%area_cell(j)
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
         do i = mesh%full_lon_ibeg, mesh%full_lon_iend
@@ -309,6 +375,11 @@ contains
       end do
     end if
 #endif
+
+#ifdef Detail_Time
+  call Get_Start_Time(tran_time_start)
+#endif
+
     if (div_damp_order == 4) then
       call fill_halo(block, state%div, full_lon=.true., full_lat=.true., full_lev=.true.)
     else
@@ -316,8 +387,14 @@ contains
       call fill_halo(block, state%div, full_lon=.true., full_lat=.true., full_lev=.true., west_halo=.false., north_halo=.false.)
 #else
       call fill_halo(block, state%div, full_lon=.true., full_lat=.true., full_lev=.true., west_halo=.false., south_halo=.false.)
+      !call fill_halo(block, state%div, full_lon=.true., full_lat=.true., full_lev=.true.)
 #endif
     end if
+
+#ifdef Detail_Time
+  call Get_End_Time(tran_time_end)
+  write((10000+myid),*) , 5 , tran_time_end - tran_time_start
+#endif
 
     if (div_damp_order == 4) then
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
@@ -332,11 +409,23 @@ contains
           end do
         end do
       end do
+
+#ifdef Detail_Time
+  call Get_Start_Time(tran_time_start)
+#endif
+
 #ifdef V_POLE
       call fill_halo(block, state%div2, full_lon=.true., full_lat=.true., full_lev=.true., west_halo=.false., north_halo=.false.)
 #else
       call fill_halo(block, state%div2, full_lon=.true., full_lat=.true., full_lev=.true., west_halo=.false., south_halo=.false.)
+      !call fill_halo(block, state%div2, full_lon=.true., full_lat=.true., full_lev=.true.)
 #endif
+
+#ifdef Detail_Time
+  call Get_End_Time(tran_time_end)
+  write((10000+myid),*) , 6 , tran_time_end - tran_time_start
+#endif
+
     end if
 
   end subroutine calc_div
@@ -364,7 +453,17 @@ contains
           end do
         end do
       end do
+
+#ifdef Detail_Time
+  call Get_Start_Time(tran_time_start)
+#endif
+
       call fill_halo(block, state%gz_lev, full_lon=.true., full_lat=.true., full_lev=.false.)
+
+#ifdef Detail_Time
+  call Get_End_Time(tran_time_end)
+  write((10000+myid),*) , 7 , tran_time_end - tran_time_start
+#endif
 
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
         do j = mesh%full_lat_ibeg, mesh%full_lat_iend
@@ -374,7 +473,18 @@ contains
           end do
         end do
       end do
+
+#ifdef Detail_Time
+  call Get_Start_Time(tran_time_start)
+#endif
+
       call fill_halo(block, state%gz, full_lon=.true., full_lat=.true., full_lev=.true.)
+
+#ifdef Detail_Time
+  call Get_End_Time(tran_time_end)
+  write((10000+myid),*) , 8 , tran_time_end - tran_time_start
+#endif
+
     end if
 
   end subroutine calc_gz_lev_gz
@@ -411,7 +521,17 @@ contains
         end do
       end do
     end if
+
+#ifdef Detail_Time
+  call Get_Start_Time(tran_time_start)
+#endif
+
     call fill_halo(block, state%m, full_lon=.true., full_lat=.true., full_lev=.true.)
+
+#ifdef Detail_Time
+  call Get_End_Time(tran_time_end)
+  write((10000+myid),*) , 9 , tran_time_end - tran_time_start
+#endif
 
   end subroutine calc_m
 
@@ -442,12 +562,34 @@ contains
 
       call interp_cell_to_edge_on_full_level(mesh, state%pt, state%pt_lon, state%pt_lat, reversed_area=.true., &
                                              u=state%u, v=state%v)
+
+#ifdef Detail_Time
+  call Get_Start_Time(tran_time_start)
+#endif
+
       call fill_halo(block, state%pt_lon, full_lon=.false., full_lat=.true., full_lev=.true.)
+
+#ifdef Detail_Time
+  call Get_End_Time(tran_time_end)
+  write((10000+myid),*) , 10 , tran_time_end - tran_time_start
+#endif
+
+#ifdef Detail_Time
+  call Get_Start_Time(tran_time_start)
+#endif
+
 #ifdef V_POLE
       call fill_halo(block, state%pt_lat, full_lon=.true., full_lat=.false., full_lev=.true., south_halo=.false.)
 #else
       call fill_halo(block, state%pt_lat, full_lon=.true., full_lat=.false., full_lev=.true., north_halo=.false.)
+      !call fill_halo(block, state%pt_lat, full_lon=.true., full_lat=.false., full_lev=.true.)
 #endif
+
+#ifdef Detail_Time
+  call Get_End_Time(tran_time_end)
+  write((10000+myid),*) , 11  ,tran_time_end - tran_time_start
+#endif
+
       call interp_full_level_to_half_level_on_cell(mesh, state%pt, state%pt_lev)
     end if
 
@@ -485,7 +627,17 @@ contains
         end do
       end do
     end do
+
+#ifdef Detail_Time
+  call Get_Start_Time(tran_time_start)
+#endif  
+
     call fill_halo(block, state%mf_lon_n, full_lon=.false., full_lat=.true., full_lev=.true.)
+
+#ifdef Detail_Time
+  call Get_End_Time(tran_time_end)
+  write((10000+myid),*) , 12  ,tran_time_end - tran_time_start
+#endif
 
     do k = mesh%full_lev_ibeg, mesh%full_lev_iend
       do j = mesh%half_lat_ibeg_no_pole, mesh%half_lat_iend_no_pole
@@ -494,7 +646,17 @@ contains
         end do
       end do
     end do
+
+#ifdef Detail_Time
+  call Get_Start_Time(tran_time_start)
+#endif
+
     call fill_halo(block, state%mf_lat_n, full_lon=.true., full_lat=.false., full_lev=.true.)
+
+#ifdef Detail_Time
+  call Get_End_Time(tran_time_end)
+  write((10000+myid),*) , 13  ,tran_time_end - tran_time_start
+#endif
 
   end subroutine calc_mf_lon_n_mf_lat_n
 
@@ -884,6 +1046,7 @@ contains
     type(mesh_type), pointer :: mesh
     integer i, j, k, move
     real(r8) pole(state%mesh%num_full_lev)
+    real(r8) order_reduce(state%mesh%full_lon_ibeg : state%mesh%full_lon_iend)
 
     mesh => state%mesh
 
@@ -932,12 +1095,21 @@ contains
     if (mesh%has_south_pole()) then
       j = mesh%full_lat_ibeg
       pole = 0.0_r8
+#ifdef Ensure_Order
+      do k = mesh%full_lev_ibeg, mesh%full_lev_iend
+        do i = mesh%full_lon_ibeg, mesh%full_lon_iend
+          order_reduce(i) = state%mf_lat_n(i,j,k)
+        end do
+        call zonal_sum_ensure_order(proc%zonal_comm , order_reduce, pole(k))
+      end do
+#else
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
         do i = mesh%full_lon_ibeg, mesh%full_lon_iend
           pole(k) = pole(k) + state%mf_lat_n(i,j,k)
         end do
       end do
       call zonal_sum(proc%zonal_comm, pole)
+#endif
       pole = pole * mesh%le_lat(j) / global_mesh%num_full_lon / mesh%area_cell(j)
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
         do i = mesh%full_lon_ibeg, mesh%full_lon_iend
@@ -948,12 +1120,21 @@ contains
     if (mesh%has_north_pole()) then
       j = mesh%full_lat_iend
       pole = 0.0_r8
+#ifdef Ensure_Order
+      do k = mesh%full_lev_ibeg, mesh%full_lev_iend
+        do i = mesh%full_lon_ibeg, mesh%full_lon_iend
+          order_reduce(i) = - state%mf_lat_n(i,j-1,k)
+        end do
+        call zonal_sum_ensure_order(proc%zonal_comm , order_reduce, pole(k))
+      end do
+#else
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
         do i = mesh%full_lon_ibeg, mesh%full_lon_iend
           pole(k) = pole(k) - state%mf_lat_n(i,j-1,k)
         end do
       end do
       call zonal_sum(proc%zonal_comm, pole)
+#endif
       pole = pole * mesh%le_lat(j-1) / global_mesh%num_full_lon / mesh%area_cell(j)
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
         do i = mesh%full_lon_ibeg, mesh%full_lon_iend
@@ -975,6 +1156,7 @@ contains
     type(mesh_type), pointer :: mesh
     integer i, j, k, move
     real(r8) pole(state%mesh%num_full_lev)
+    real(r8) order_reduce(state%mesh%full_lon_ibeg : state%mesh%full_lon_iend)
 
     if (baroclinic) then
       mesh => state%mesh
@@ -1026,12 +1208,21 @@ contains
       if (mesh%has_south_pole()) then
         j = mesh%full_lat_ibeg
         pole = 0.0_r8
+#ifdef Ensure_Order
+        do k = mesh%full_lev_ibeg, mesh%full_lev_iend
+          do i = mesh%full_lon_ibeg, mesh%full_lon_iend
+            order_reduce(i) = state%mf_lat_n(i,j,k) * state%pt_lat(i,j,k)
+          end do
+          call zonal_sum_ensure_order(proc%zonal_comm , order_reduce, pole(k))
+        end do     
+#else
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
           do i = mesh%full_lon_ibeg, mesh%full_lon_iend
             pole(k) = pole(k) + state%mf_lat_n(i,j,k) * state%pt_lat(i,j,k)
           end do
         end do
         call zonal_sum(proc%zonal_comm, pole)
+#endif
         pole = pole * mesh%le_lat(j) / global_mesh%num_full_lon / mesh%area_cell(j)
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
           do i = mesh%full_lon_ibeg, mesh%full_lon_iend
@@ -1042,12 +1233,21 @@ contains
       if (mesh%has_north_pole()) then
         j = mesh%full_lat_iend
         pole = 0.0_r8
+#ifdef Ensure_Order
+        do k = mesh%full_lev_ibeg, mesh%full_lev_iend
+          do i = mesh%full_lon_ibeg, mesh%full_lon_iend
+            order_reduce(i) = - state%mf_lat_n(i,j-1,k) * state%pt_lat(i,j-1,k)
+          end do
+          call zonal_sum_ensure_order(proc%zonal_comm , order_reduce, pole(k))
+        end do  
+#else
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
           do i = mesh%full_lon_ibeg, mesh%full_lon_iend
             pole(k) = pole(k) - state%mf_lat_n(i,j-1,k) * state%pt_lat(i,j-1,k)
           end do
         end do
         call zonal_sum(proc%zonal_comm, pole)
+#endif
         pole = pole * mesh%le_lat(j-1) / global_mesh%num_full_lon / mesh%area_cell(j)
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
           do i = mesh%full_lon_ibeg, mesh%full_lon_iend

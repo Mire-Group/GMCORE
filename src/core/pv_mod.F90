@@ -1,3 +1,5 @@
+#define Ensure_Order
+
 module pv_mod
 
   use const_mod
@@ -26,6 +28,7 @@ contains
     type(mesh_type), pointer :: mesh
     real(r8) pole(state%mesh%num_full_lev)
     integer i, j, k
+    real(r8) order_reduce(state%mesh%half_lon_ibeg : state%mesh%half_lon_iend)
 
     mesh => state%mesh
 
@@ -85,12 +88,23 @@ contains
       if (mesh%has_south_pole()) then
         j = mesh%half_lat_ibeg
         pole = 0.0_r8
+#ifdef Ensure_Order
+        do k = mesh%full_lev_ibeg, mesh%full_lev_iend
+          do i = mesh%half_lon_ibeg, mesh%half_lon_iend
+            order_reduce(i) = - state%u(i,j+1,k) * mesh%de_lon(j+1)
+          end do
+          call zonal_sum_ensure_order(proc%zonal_comm , order_reduce, pole(k))
+        end do
+        !write(*,*) , pole(1)
+#else
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
           do i = mesh%half_lon_ibeg, mesh%half_lon_iend
             pole(k) = pole(k) - state%u(i,j+1,k) * mesh%de_lon(j+1)
           end do
         end do
         call zonal_sum(proc%zonal_comm, pole)
+        !write(*,*) , pole(1)
+#endif
         pole = pole / global_mesh%num_half_lon / mesh%area_vtx(j)
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
           do i = mesh%half_lon_ibeg, mesh%half_lon_iend
@@ -101,12 +115,21 @@ contains
       if (mesh%has_north_pole()) then
         j = mesh%half_lat_iend
         pole = 0.0_r8
+#ifdef Ensure_Order
+        do k = mesh%full_lev_ibeg, mesh%full_lev_iend
+          do i = mesh%half_lon_ibeg, mesh%half_lon_iend
+            order_reduce(i) = state%u(i,j,k) * mesh%de_lon(j)
+          end do
+          call zonal_sum_ensure_order(proc%zonal_comm , order_reduce, pole(k))
+        end do
+#else
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
           do i = mesh%half_lon_ibeg, mesh%half_lon_iend
             pole(k) = pole(k) + state%u(i,j,k) * mesh%de_lon(j)
           end do
         end do
         call zonal_sum(proc%zonal_comm, pole)
+#endif
         pole = pole / global_mesh%num_half_lon / mesh%area_vtx(j)
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
           do i = mesh%half_lon_ibeg, mesh%half_lon_iend
@@ -166,6 +189,7 @@ contains
     call fill_halo(block, state%dpv_lat_t, full_lon=.true., full_lat=.false., full_lev=.true., west_halo=.false., south_halo=.false.)
 #else
     call fill_halo(block, state%dpv_lat_t, full_lon=.true., full_lat=.false., full_lev=.true., west_halo=.false., north_halo=.false.)
+    !call fill_halo(block, state%dpv_lat_t, full_lon=.true., full_lat=.false., full_lev=.true.)
 #endif
 
     do k = mesh%full_lev_ibeg, mesh%full_lev_iend
@@ -183,6 +207,7 @@ contains
     call fill_halo(block, state%dpv_lon_t, full_lon=.false., full_lat=.true., full_lev=.true., east_halo=.false., north_halo=.false.)
 #else
     call fill_halo(block, state%dpv_lon_t, full_lon=.false., full_lat=.true., full_lev=.true., east_halo=.false., south_halo=.false.)
+    !call fill_halo(block, state%dpv_lon_t, full_lon=.false., full_lat=.true., full_lev=.true.)
 #endif
 
     ! Normal pv difference
@@ -237,6 +262,7 @@ contains
     call fill_halo(block, state%pv_lat, full_lon=.true., full_lat=.false., full_lev=.true., west_halo=.false., south_halo=.false.)
 #else
     call fill_halo(block, state%pv_lat, full_lon=.true., full_lat=.false., full_lev=.true., west_halo=.false., north_halo=.false.)
+    !call fill_halo(block, state%pv_lat, full_lon=.true., full_lat=.false., full_lev=.true.)
 #endif
 
     do k = mesh%full_lev_ibeg, mesh%full_lev_iend
@@ -254,6 +280,7 @@ contains
     call fill_halo(block, state%pv_lon, full_lon=.false., full_lat=.true., full_lev=.true., east_halo=.false., north_halo=.false.)
 #else
     call fill_halo(block, state%pv_lon, full_lon=.false., full_lat=.true., full_lev=.true., east_halo=.false., south_halo=.false.)
+    !call fill_halo(block, state%pv_lon, full_lon=.false., full_lat=.true., full_lev=.true.)
 #endif
 
   end subroutine calc_pv_edge_midpoint
@@ -294,6 +321,7 @@ contains
     call fill_halo(block, state%pv_lat, full_lon=.true., full_lat=.false., full_lev=.true., west_halo=.false., south_halo=.false.)
 #else
     call fill_halo(block, state%pv_lat, full_lon=.true., full_lat=.false., full_lev=.true., west_halo=.false., north_halo=.false.)
+    !call fill_halo(block, state%pv_lat, full_lon=.true., full_lat=.false., full_lev=.true.)
 #endif
 
     do k = mesh%full_lev_ibeg, mesh%full_lev_iend
@@ -323,6 +351,7 @@ contains
     call fill_halo(block, state%pv_lon, full_lon=.false., full_lat=.true., full_lev=.true., east_halo=.false., north_halo=.false.)
 #else
     call fill_halo(block, state%pv_lon, full_lon=.false., full_lat=.true., full_lev=.true., east_halo=.false., south_halo=.false.)
+    !call fill_halo(block, state%pv_lon, full_lon=.false., full_lat=.true., full_lev=.true.)
 #endif
 
   end subroutine calc_pv_edge_apvm

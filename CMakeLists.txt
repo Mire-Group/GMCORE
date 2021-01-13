@@ -34,7 +34,7 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Intel")
   if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -no-wrap-margin -O0 -check bounds -g -traceback -mkl")
   else ()
-    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -no-wrap-margin -O3 -align array64byte -mkl")
+    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -xCORE-AVX2 -no-wrap-margin -O3 -align array64byte -mkl")
   endif ()
 endif ()
 
@@ -108,6 +108,7 @@ set(gmcore_files
   src/utils/parallel_mod.F90
   src/utils/tridiag_mod.F90
   src/utils/debug_mod.F90
+  src/utils/performance_analysis_mod.F90
   src/core/time_schemes_mod.F90
   src/core/pgf/pgf_mod.F90
   src/core/pgf/pgf_swm_mod.F90

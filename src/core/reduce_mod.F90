@@ -98,6 +98,7 @@ contains
       end do
       do j = blocks(iblk)%mesh%full_lat_ibeg - 1, blocks(iblk)%mesh%full_lat_iend + 1
         if (blocks(iblk)%reduced_mesh(j)%reduce_factor > 0) then
+          blocks(iblk)%NeedReduce = .true.
           call allocate_reduced_static(blocks(iblk)%reduced_mesh(j), blocks(iblk)%reduced_static(j))
           call reduce_static(j, blocks(iblk), blocks(iblk)%mesh, blocks(iblk)%static, blocks(iblk)%reduced_mesh(j), blocks(iblk)%reduced_static(j))
           call allocate_reduced_state(blocks(iblk)%reduced_mesh(j), blocks(iblk)%reduced_state(j))
@@ -137,7 +138,11 @@ contains
     integer i, buf_j
 
     ! Check if decomposition is OK for reduce.
-    if (mod(raw_mesh%num_full_lon / reduce_factor, proc%cart_dims(1)) /= 0) then
+    ! if (mod(raw_mesh%num_full_lon / reduce_factor, proc%cart_dims(1)) /= 0) then
+    !   if (is_root_proc()) call log_error('Parallel zonal decomposition cannot divide reduced zonal grids!')
+    ! end if
+
+    if (mod(raw_mesh%num_full_lon , reduce_factor) /= 0) then
       if (is_root_proc()) call log_error('Parallel zonal decomposition cannot divide reduced zonal grids!')
     end if
 

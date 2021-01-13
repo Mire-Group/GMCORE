@@ -47,6 +47,7 @@ module block_mod
     type(reduced_static_type), allocatable :: reduced_static(:)
     type(reduced_tend_type), allocatable :: reduced_tend(:)
     type(halo_type), allocatable :: halo(:)
+    logical NeedReduce
   contains
     procedure :: init => block_init
     final :: block_final
@@ -70,6 +71,8 @@ contains
     this%id = id
 
     call this%mesh%init_from_parent(global_mesh, this%id, lon_halo_width, lat_halo_width, lon_ibeg, lon_iend, lat_ibeg, lat_iend)
+    
+    this%NeedReduce = 0
 
     if (.not. allocated(this%state)) then
       select case (trim(time_scheme))

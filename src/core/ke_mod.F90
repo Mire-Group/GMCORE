@@ -1,3 +1,5 @@
+#define Ensure_Order
+
 module ke_mod
 
   use const_mod
@@ -23,6 +25,7 @@ contains
     type(mesh_type), pointer :: mesh
     integer i, j, k
     real(r8) ke_vtx(4), pole(state%mesh%num_full_lev)
+    real(r8) order_reduce(state%mesh%full_lon_ibeg : state%mesh%full_lon_iend)
 
     mesh => state%mesh
 
@@ -83,12 +86,21 @@ contains
     if (mesh%has_south_pole()) then
       j = mesh%full_lat_ibeg
       pole = 0.0d0
+#ifdef Ensure_Order
+      do k = mesh%full_lev_ibeg, mesh%full_lev_iend
+        do i = mesh%full_lon_ibeg, mesh%full_lon_iend
+          order_reduce(i) = state%v(i,j,k)**2
+        end do
+        call zonal_sum_ensure_order(proc%zonal_comm , order_reduce, pole(k))
+      end do
+#else
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
         do i = mesh%full_lon_ibeg, mesh%full_lon_iend
           pole(k) = pole(k) + state%v(i,j,k)**2
         end do
       end do
       call zonal_sum(proc%zonal_comm, pole)
+#endif   
       pole = pole / mesh%num_full_lon * 0.5_r8
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
         do i = mesh%full_lon_ibeg, mesh%full_lon_iend
@@ -99,12 +111,21 @@ contains
     if (mesh%has_north_pole()) then
       j = mesh%full_lat_iend
       pole = 0.0d0
+#ifdef Ensure_Order
+      do k = mesh%full_lev_ibeg, mesh%full_lev_iend
+        do i = mesh%full_lon_ibeg, mesh%full_lon_iend
+          order_reduce(i) = state%v(i,j-1,k)**2
+        end do
+        call zonal_sum_ensure_order(proc%zonal_comm , order_reduce, pole(k))
+      end do
+#else
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
         do i = mesh%full_lon_ibeg, mesh%full_lon_iend
           pole(k) = pole(k) + state%v(i,j-1,k)**2
         end do
       end do
       call zonal_sum(proc%zonal_comm, pole)
+#endif
       pole = pole / mesh%num_full_lon * 0.5_r8
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
         do i = mesh%full_lon_ibeg, mesh%full_lon_iend
@@ -114,6 +135,7 @@ contains
     end if
 #endif
     call fill_halo(block, state%ke, full_lon=.true., full_lat=.true., full_lev=.true., west_halo=.false.)
+    !call fill_halo(block, state%ke, full_lon=.true., full_lat=.true., full_lev=.true.)
 
   end subroutine calc_ke_cell
 

@@ -64,6 +64,8 @@ module process_mod
     integer lon_iend
     integer lat_ibeg
     integer lat_iend
+
+    logical NeedReduce
     type(process_neighbor_type), allocatable :: ngb(:) ! Neighbor processes
     type(block_type), allocatable :: blocks(:)
   end type process_type
@@ -85,6 +87,8 @@ contains
       proc%comm = MPI_COMM_WORLD
     end if
     call MPI_COMM_GROUP(proc%comm, proc%group, ierr)
+
+    proc%NeedReduce = 0
 
     call setup_mpi_1d_lat()
     call decompose_domains()

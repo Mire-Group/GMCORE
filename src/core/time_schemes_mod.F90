@@ -1,3 +1,4 @@
+#define Detail_Time
 module time_schemes_mod
 
   use flogger
@@ -7,6 +8,7 @@ module time_schemes_mod
   use block_mod
   use operators_mod
   use parallel_mod
+  use pa_mod
 
   implicit none
 
@@ -83,7 +85,17 @@ contains
             new_state%phs(i,j) = old_state%phs(i,j) + dt * tend%dphs(i,j)
           end do
         end do
+
+#ifdef Detail_Time
+  call Get_Start_Time(tran_time_start)
+#endif
+
         call fill_halo(block, new_state%phs, full_lon=.true., full_lat=.true.)
+
+#ifdef Detail_Time
+  call Get_End_Time(tran_time_end)
+  write((20000+myid),*) , 1 , tran_time_end - tran_time_start
+#endif
 
         call calc_ph_lev_ph(block, new_state)
         call calc_m        (block, new_state)
@@ -103,7 +115,17 @@ contains
             end do
           end do
         end do
+
+#ifdef Detail_Time
+  call Get_Start_Time(tran_time_start)
+#endif
         call fill_halo(block, new_state%pt, full_lon=.true., full_lat=.true., full_lev=.true.)
+
+#ifdef Detail_Time
+  call Get_End_Time(tran_time_end)
+  write((20000+myid),*) , 2 , tran_time_end - tran_time_start
+#endif
+
       else if (tend%copy_pt) then
         new_state%pt = old_state%pt
       end if
@@ -116,7 +138,18 @@ contains
             end do
           end do
         end do
+
+#ifdef Detail_Time
+  call Get_Start_Time(tran_time_start)
+#endif
+
         call fill_halo(block, new_state%gz, full_lon=.true., full_lat=.true.)
+
+#ifdef Detail_Time
+  call Get_End_Time(tran_time_end)
+  write((20000+myid),*) , 3 , tran_time_end - tran_time_start
+#endif
+
       else if (tend%copy_gz) then
         new_state%gz = old_state%gz
       end if
@@ -130,7 +163,14 @@ contains
           end do
         end do
       end do
+#ifdef Detail_Time
+  call Get_Start_Time(tran_time_start)
+#endif
       call fill_halo(block, new_state%u, full_lon=.false., full_lat=.true., full_lev=.true.)
+#ifdef Detail_Time
+  call Get_End_Time(tran_time_end)
+  write((20000+myid),*) , 4 , tran_time_end - tran_time_start
+#endif
     end if
 
     if (tend%updated_dv) then
@@ -141,7 +181,14 @@ contains
           end do
         end do
       end do
+#ifdef Detail_Time
+  call Get_Start_Time(tran_time_start)
+#endif
       call fill_halo(block, new_state%v, full_lon=.true., full_lat=.false., full_lev=.true.)
+#ifdef Detail_Time
+  call Get_End_Time(tran_time_end)
+  write((20000+myid),*) , 5 , tran_time_end - tran_time_start
+#endif
     end if
 
     call operators_prepare(block, new_state, dt, pass)

@@ -74,6 +74,7 @@ module state_mod
     real(r8), allocatable, dimension(:,:,:) :: div           ! Divergence (s-1)
     real(r8), allocatable, dimension(:,:,:) :: div2          ! Laplacian of divergence (s-1)
     real(r8), allocatable, dimension(:,:,:) :: vor           ! Vorticity (s-1)
+    real(r8), allocatable, dimension(:,:,:) :: test
     real(r8) tm
     real(r8) te
     real(r8) tpe
@@ -139,6 +140,8 @@ contains
     call allocate_array(mesh, this%div          , full_lon=.true., full_lat=.true., full_lev=.true.)
     call allocate_array(mesh, this%vor          , half_lon=.true., half_lat=.true., full_lev=.true.)
     call allocate_array(mesh, this%ak           , full_lon=.true., full_lat=.true., full_lev=.true.)
+
+    call allocate_array(mesh, this%test           , full_lon=.true., full_lat=.true., full_lev=.true.)
 
     if (baroclinic .and. .not. hydrostatic) then
       call allocate_array(mesh, this%w            , full_lon=.true., full_lat=.true., half_lev=.true.)
@@ -221,6 +224,8 @@ contains
     if (allocated(this%vor          )) deallocate(this%vor          )
 
     if (allocated(this%async        )) deallocate(this%async        )
+
+    if (allocated(this%test        )) deallocate(this%test        )
 
   end subroutine state_clear
 
