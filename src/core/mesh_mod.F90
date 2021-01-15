@@ -56,7 +56,7 @@ module mesh_mod
     real(r8) end_lon
     real(r8) start_lat
     real(r8) end_lat
-    real(r8) dlon
+    real(r8) dlon ! 
     real(r8), allocatable, dimension(:  ) :: dlat
     real(r8), allocatable, dimension(:  ) :: full_dlev
     real(r8), allocatable, dimension(:  ) :: half_dlev
@@ -141,28 +141,28 @@ contains
     real(16) x(3), y(3), z(3)
     integer i, j, j0, jj
 
-    this%num_full_lon  = num_lon
+    this%num_full_lon  = num_lon    ! 360°划分为多少
     this%num_half_lon  = num_lon
     this%full_lon_ibeg = 1
     this%full_lon_iend = this%num_full_lon
     this%half_lon_ibeg = 1
     this%half_lon_iend = this%num_half_lon
-#ifdef V_POLE
-    this%num_full_lat  = num_lat - 1
-    this%num_half_lat  = num_lat
-    this%half_lat_ibeg = 1
-    this%half_lat_iend = this%num_half_lat
-    this%full_lat_ibeg = 1
-    this%full_lat_iend = this%num_full_lat
-#else
-    this%num_full_lat  = num_lat
-    this%num_half_lat  = num_lat - 1
-    this%full_lat_ibeg = 1
-    this%full_lat_iend = this%num_full_lat
-    this%half_lat_ibeg = 1
-    this%half_lat_iend = this%num_half_lat
-#endif
-    this%num_full_lev  = merge(num_lev, 1, present(num_lev))
+    #ifdef V_POLE
+      this%num_full_lat  = num_lat - 1
+      this%num_half_lat  = num_lat
+      this%half_lat_ibeg = 1
+      this%half_lat_iend = this%num_half_lat
+      this%full_lat_ibeg = 1
+      this%full_lat_iend = this%num_full_lat
+    #else
+      this%num_full_lat  = num_lat  ! -90°~90°划分为多少，half比full少1 
+      this%num_half_lat  = num_lat - 1
+      this%full_lat_ibeg = 1
+      this%full_lat_iend = this%num_full_lat
+      this%half_lat_ibeg = 1
+      this%half_lat_iend = this%num_half_lat
+    #endif
+    this%num_full_lev  = merge(num_lev, 1, present(num_lev))  ! 半层比整层多1
     this%num_half_lev  = this%num_full_lev + 1
     this%full_lev_ibeg = 1
     this%full_lev_iend = this%num_full_lev
@@ -170,7 +170,7 @@ contains
     this%half_lev_iend = this%num_half_lev
 
     ! Here we set baroclinic according to levels.
-    baroclinic = this%num_full_lev > 1
+    baroclinic = this%num_full_lev > 1  ! baroclinic 斜压
     if (.not. baroclinic) then
       hydrostatic = .false.
       nonhydrostatic = .false.
@@ -180,15 +180,15 @@ contains
     this%lon_halo_width = merge(lon_halo_width,  1, present(lon_halo_width))
     this%lat_halo_width = merge(lat_halo_width,  1, present(lat_halo_width))
     this%start_lon      = 0.0_r8
-    this%end_lon        =  pi2
-    this%start_lat      = -pi05
-    this%end_lat        =  pi05
+    this%end_lon        =  pi2  !  360°
+    this%start_lat      = -pi05 ! -90°
+    this%end_lat        =  pi05 !  90°
 
     call this%common_init()
 
-    this%dlon = (this%end_lon - this%start_lon) / this%num_full_lon
+    this%dlon = (this%end_lon - this%start_lon) / this%num_full_lon ! dlon是Δ经度
     do i = this%full_lon_lb, this%full_lon_ub
-      this%full_lon(i) = this%start_lon + (i - 1) * this%dlon
+      this%full_lon(i) = this%start_lon + (i - 1) * this%dlon  ! 同一个i，full_lon在先，half_lon在后
       this%half_lon(i) = this%full_lon(i) + 0.5_r8 * this%dlon
       this%full_lon_deg(i) = this%full_lon(i) * deg
       this%half_lon_deg(i) = this%half_lon(i) * deg
@@ -556,9 +556,10 @@ contains
       this%area_lat(j) = this%area_lat_north(j) + this%area_lat_south(j)
     end do
 #endif
-
+    ! de: distance of edge (边两侧网格中心的距离）
+    ! le: length of edge
     do j = this%full_lat_ibeg_no_pole, this%full_lat_iend_no_pole
-      this%de_lon(j) = radius * this%full_cos_lat(j) * this%dlon
+      this%de_lon(j) = radius * this%full_cos_lat(j) * this%dlon   
       this%le_lon(j) = 2.0d0 * this%area_lon(j) / this%de_lon(j)
     end do
 #ifndef V_POLE

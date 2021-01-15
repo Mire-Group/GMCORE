@@ -18,7 +18,7 @@ module nh_mod
   public nh_solve
 
 contains
-
+  ! 负责隐式求解w和gz，包括需要预计算的准备项
   subroutine nh_solve(block, tend, old_state, new_state, dt)
 
     type(block_type), intent(inout) :: block
@@ -49,10 +49,11 @@ contains
 
     call diag_rhod            (block, new_state)
     call diag_p               (block, new_state)
-    call reduce_run           (block, new_state, dt, nh_pass)
+    call reduce_run           (block, new_state, dt, nh_pass) ! reduce_run用来干嘛的？
 
   end subroutine nh_solve
-
+  
+  ! 计算半层处的layer_ph
   subroutine diag_m_lev(block, state)
 
     type(block_type), intent(in) :: block
@@ -61,7 +62,7 @@ contains
     integer i, j, k
 
     associate (mesh => block%mesh)
-      do k = mesh%half_lev_ibeg + 1, mesh%half_lev_iend - 1
+      do k = mesh%half_lev_ibeg + 1, mesh%half_lev_iend - 1 ! middle part
         do j = mesh%full_lat_ibeg, mesh%full_lat_iend
           do i = mesh%full_lon_ibeg, mesh%full_lon_iend
             state%m_lev(i,j,k) = state%ph(i,j,k) - state%ph(i,j,k-1)
@@ -86,6 +87,7 @@ contains
 
   end subroutine diag_m_lev
 
+  ! 将垂直坐标速度乘偏Π/偏η的积插值到cell
   subroutine interp_wedphdlev(block, state)
 
     type(block_type), intent(in) :: block
@@ -95,6 +97,7 @@ contains
 
   end subroutine interp_wedphdlev
 
+  ! 将质量通量从整层上的lon_edge和lat_edge分别插值到半层上的lev_lon_edge和lat_lon_edge
   subroutine interp_mf(block, state)
 
     type(block_type), intent(in) :: block
@@ -107,6 +110,7 @@ contains
 
   end subroutine interp_mf
 
+  ! 将gz从半层上的lev_edge插值到中心cell，半层上的lev_lon_edge和lat_lon_edge
   subroutine interp_gz(block, state)
 
     type(block_type), intent(in) :: block
@@ -120,6 +124,7 @@ contains
 
   end subroutine interp_gz
 
+  ! 将w从半层上的lev_edge插值到中心cell，半层上的lev_lon_edge和lat_lon_edge
   subroutine interp_w(block, state)
 
     type(block_type), intent(in) :: block
@@ -129,11 +134,11 @@ contains
     call interp_lev_edge_to_lev_lon_edge(block%mesh, state%w_lev, state%w_lev_lon, u=state%mf_lev_lon_n)
     call interp_lev_edge_to_lev_lat_edge(block%mesh, state%w_lev, state%w_lev_lat, v=state%mf_lev_lat_n)
     call fill_halo(block, state%w_lev_lon, full_lon=.false., full_lat=.true. , full_lev=.false., south_halo=.false., north_halo=.false.)
-#ifdef V_POLE
-    call fill_halo(block, state%w_lev_lat, full_lon=.true. , full_lat=.false., full_lev=.false., west_halo=.false., east_halo=.false., south_halo=.false.)
-#else
-    call fill_halo(block, state%w_lev_lat, full_lon=.true. , full_lat=.false., full_lev=.false., west_halo=.false., east_halo=.false., north_halo=.false.)
-#endif
+    #ifdef V_POLE
+      call fill_halo(block, state%w_lev_lat, full_lon=.true. , full_lat=.false., full_lev=.false., west_halo=.false., east_halo=.false., south_halo=.false.)
+    #else
+      call fill_halo(block, state%w_lev_lat, full_lon=.true. , full_lat=.false., full_lev=.false., west_halo=.false., east_halo=.false., north_halo=.false.)
+    #endif
 
   end subroutine interp_w
 
@@ -163,9 +168,11 @@ contains
                adv_gz_lon    => tend%adv_gz_lon    , &
                adv_gz_lat    => tend%adv_gz_lat    , &
                adv_gz_lev    => tend%adv_gz_lev)
-      do k = mesh%half_lev_ibeg, mesh%half_lev_iend - 1
-        do j = mesh%full_lat_ibeg_no_pole, mesh%full_lat_iend_no_pole
-          if (reduced_mesh(j)%reduce_factor > 1) then
+      ! 水平对流项
+      ! 纬向对流
+      do k = mesh%half_lev_ibeg, mesh%half_lev_iend - 1 ! TODO:应该包含mesh%half_lev_iend也要做
+        do j = mesh%full_lat_ibeg_no_pole, mesh%full_lat_iend_no_pole ! 不含极点
+          if (reduced_mesh(j)%reduce_factor > 1) then ! 简并区
             adv_gz_lon(:,j,k) = 0.0_r8
             do move = 1, reduced_mesh(j)%reduce_factor
               do i = reduced_mesh(j)%full_lon_ibeg, reduced_mesh(j)%full_lon_iend
@@ -193,60 +200,61 @@ contains
           end if
         end do
       end do
-
-      do k = mesh%half_lev_ibeg, mesh%half_lev_iend - 1
-        do j = mesh%full_lat_ibeg_no_pole, mesh%full_lat_iend_no_pole
+      ! 经向对流
+      do k = mesh%half_lev_ibeg, mesh%half_lev_iend - 1 ! TODO:应该包含mesh%half_lev_iend也要做
+        do j = mesh%full_lat_ibeg_no_pole, mesh%full_lat_iend_no_pole ! 不含极点
           do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-#ifdef V_POLE
-            adv_gz_lat(i,j,k) = (                                             &
-              mf_lev_lat_n(i,j+1,k) * (gz_lev_lat(i,j+1,k) - gz_lev(i,j,k)) - &
-              mf_lev_lat_n(i,j  ,k) * (gz_lev_lat(i,j  ,k) - gz_lev(i,j,k))   &
-            ) / mesh%de_lat(j) / m_lev(i,j,k)
-#else
-            adv_gz_lat(i,j,k) = (                                             &
-              mf_lev_lat_n(i,j  ,k) * (gz_lev_lat(i,j  ,k) - gz_lev(i,j,k)) - &
-              mf_lev_lat_n(i,j-1,k) * (gz_lev_lat(i,j-1,k) - gz_lev(i,j,k))   &
-            ) / mesh%de_lat(j) / m_lev(i,j,k)
-#endif
+            #ifdef V_POLE
+              adv_gz_lat(i,j,k) = (                                             &
+                mf_lev_lat_n(i,j+1,k) * (gz_lev_lat(i,j+1,k) - gz_lev(i,j,k)) - &
+                mf_lev_lat_n(i,j  ,k) * (gz_lev_lat(i,j  ,k) - gz_lev(i,j,k))   &
+              ) / mesh%de_lat(j) / m_lev(i,j,k)
+            #else
+              adv_gz_lat(i,j,k) = (                                             &
+                mf_lev_lat_n(i,j  ,k) * (gz_lev_lat(i,j  ,k) - gz_lev(i,j,k)) - &
+                mf_lev_lat_n(i,j-1,k) * (gz_lev_lat(i,j-1,k) - gz_lev(i,j,k))   &
+              ) / mesh%de_lat(j) / m_lev(i,j,k)
+            #endif
           end do
         end do
       end do
-#ifndef V_POLE
-      if (mesh%has_south_pole()) then
-        j = mesh%full_lat_ibeg
-        pole = 0.0_r8
-        do k = mesh%full_lev_ibeg, mesh%full_lev_iend
-          do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-            pole(k) = pole(k) + mf_lev_lat_n(i,j,k) * (gz_lev_lat(i,j,k) - gz_lev(i,j,k))
+      ! 极点处只处理经向对流，极点的u一直是0（极点只有一个u，w和gz，但有多个v，像一个圆形的网格）
+      #ifndef V_POLE
+        if (mesh%has_south_pole()) then
+          j = mesh%full_lat_ibeg
+          pole = 0.0_r8 ! 数组整体赋值 real(r8) pole(state%mesh%num_full_lev) TODO pole要改成num_half_lev的大小
+          do k = mesh%full_lev_ibeg, mesh%full_lev_iend ! TODO k用half
+            do i = mesh%full_lon_ibeg, mesh%full_lon_iend ! 极点周围一圈求和
+              pole(k) = pole(k) + mf_lev_lat_n(i,j,k) * (gz_lev_lat(i,j,k) - gz_lev(i,j,k))
+            end do
           end do
-        end do
-        call zonal_sum(proc%zonal_comm, pole)
-        pole = pole * mesh%le_lat(j) / global_mesh%num_full_lon / mesh%area_cell(j)
-        do k = mesh%full_lev_ibeg, mesh%full_lev_iend
-          do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-            adv_gz_lat(i,j,k) = pole(k) / m_lev(i,j,k) / global_mesh%num_full_lon
+          call zonal_sum(proc%zonal_comm, pole)
+          pole = pole * mesh%le_lat(j) / global_mesh%num_full_lon / mesh%area_cell(j)
+          do k = mesh%full_lev_ibeg, mesh%full_lev_iend ! TODO k用half
+            do i = mesh%full_lon_ibeg, mesh%full_lon_iend
+              adv_gz_lat(i,j,k) = pole(k) / m_lev(i,j,k) / global_mesh%num_full_lon ! m_lev代表的是一个小扇形的质量，把它们乘起来
+            end do
           end do
-        end do
-      end if
-      if (mesh%has_north_pole()) then
-        j = mesh%full_lat_iend
-        pole = 0.0_r8
-        do k = mesh%full_lev_ibeg, mesh%full_lev_iend
-          do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-            pole(k) = pole(k) - mf_lev_lat_n(i,j-1,k) * (gz_lev_lat(i,j-1,k) - gz_lev(i,j,k))
+        end if
+        if (mesh%has_north_pole()) then
+          j = mesh%full_lat_iend
+          pole = 0.0_r8
+          do k = mesh%full_lev_ibeg, mesh%full_lev_iend ! TODO k用half
+            do i = mesh%full_lon_ibeg, mesh%full_lon_iend
+              pole(k) = pole(k) - mf_lev_lat_n(i,j-1,k) * (gz_lev_lat(i,j-1,k) - gz_lev(i,j,k))
+            end do
           end do
-        end do
-        call zonal_sum(proc%zonal_comm, pole)
-        pole = pole * mesh%le_lat(j-1) / global_mesh%num_full_lon / mesh%area_cell(j)
-        do k = mesh%full_lev_ibeg, mesh%full_lev_iend
-          do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-            adv_gz_lat(i,j,k) = pole(k) / m_lev(i,j,k) / global_mesh%num_full_lon
+          call zonal_sum(proc%zonal_comm, pole)
+          pole = pole * mesh%le_lat(j-1) / global_mesh%num_full_lon / mesh%area_cell(j)
+          do k = mesh%full_lev_ibeg, mesh%full_lev_iend ! TODO k用half
+            do i = mesh%full_lon_ibeg, mesh%full_lon_iend
+              adv_gz_lat(i,j,k) = pole(k) / m_lev(i,j,k) / global_mesh%num_full_lon
+            end do
           end do
-        end do
-      end if
-#endif
-
-      do k = mesh%half_lev_ibeg + 1, mesh%half_lev_iend - 1
+        end if
+      #endif
+      ! 垂直对流（推公式存疑）
+      do k = mesh%half_lev_ibeg + 1, mesh%half_lev_iend - 1 ! middle part
         a = mesh%half_dlev_upper(k) / mesh%half_dlev_lower(k)
         b = mesh%half_dlev_lower(k) / mesh%half_dlev_upper(k)
         do j = mesh%full_lat_ibeg, mesh%full_lat_iend
@@ -259,31 +267,31 @@ contains
           end do
         end do
       end do
-      k = mesh%half_lev_ibeg
+      k = mesh%half_lev_ibeg  ! top
       do j = mesh%full_lat_ibeg, mesh%full_lat_iend
         do i = mesh%full_lon_ibeg, mesh%full_lon_iend
           adv_gz_lev(i,j,k) = state%wedphdlev(i,j,k) * (state%gz(i,j,k) - gz_lev(i,j,k)) / m_lev(i,j,k)
         end do
       end do
       ! Bottom gz is static topography, so no tendency for it (i.e., gzs).
-#ifndef V_POLE
-      if (mesh%has_south_pole()) then
-        j = mesh%full_lat_ibeg
-        do k = mesh%full_lev_ibeg, mesh%full_lev_iend
-          do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-            adv_gz_lev(i,j,k) = adv_gz_lev(i,j,k) / global_mesh%num_full_lon
+      #ifndef V_POLE
+        if (mesh%has_south_pole()) then
+          j = mesh%full_lat_ibeg
+          do k = mesh%full_lev_ibeg, mesh%full_lev_iend ! TODO k用half
+            do i = mesh%full_lon_ibeg, mesh%full_lon_iend ! 极点处的垂直对流要除以纬向网格数
+              adv_gz_lev(i,j,k) = adv_gz_lev(i,j,k) / global_mesh%num_full_lon
+            end do
           end do
-        end do
-      end if
-      if (mesh%has_north_pole()) then
-        j = mesh%full_lat_iend
-        do k = mesh%full_lev_ibeg, mesh%full_lev_iend
-          do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-            adv_gz_lev(i,j,k) = adv_gz_lev(i,j,k) / global_mesh%num_full_lon
+        end if
+        if (mesh%has_north_pole()) then
+          j = mesh%full_lat_iend
+          do k = mesh%full_lev_ibeg, mesh%full_lev_iend ! TODO k用half
+            do i = mesh%full_lon_ibeg, mesh%full_lon_iend ! 极点处的垂直对流要除以纬向网格数
+              adv_gz_lev(i,j,k) = adv_gz_lev(i,j,k) / global_mesh%num_full_lon
+            end do
           end do
-        end do
-      end if
-#endif
+        end if
+      #endif
     end associate
 
   end subroutine calc_adv_gz
@@ -314,7 +322,9 @@ contains
                adv_w_lon     => tend%adv_w_lon     , &
                adv_w_lat     => tend%adv_w_lat     , &
                adv_w_lev     => tend%adv_w_lev)
-      do k = mesh%half_lev_ibeg + 1, mesh%half_lev_iend - 1
+      ! 水平对流
+      ! 纬向对流
+      do k = mesh%half_lev_ibeg + 1, mesh%half_lev_iend - 1   ! middle part
         do j = mesh%full_lat_ibeg_no_pole, mesh%full_lat_iend_no_pole
           if (reduced_mesh(j)%reduce_factor > 1) then
             adv_w_lon(:,j,k) = 0.0_r8
@@ -344,59 +354,59 @@ contains
           end if
         end do
       end do
-
-      do k = mesh%half_lev_ibeg + 1, mesh%half_lev_iend - 1
+      ! 经向对流
+      do k = mesh%half_lev_ibeg + 1, mesh%half_lev_iend - 1 ! middle part
         do j = mesh%full_lat_ibeg_no_pole, mesh%full_lat_iend_no_pole
           do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-#ifdef V_POLE
-            adv_w_lat(i,j,k) = (                                            &
-              mf_lev_lat_n(i,j+1,k) * (w_lev_lat(i,j+1,k) - w_lev(i,j,k)) - &
-              mf_lev_lat_n(i,j  ,k) * (w_lev_lat(i,j  ,k) - w_lev(i,j,k))   &
-            ) / mesh%de_lat(j) / m_lev(i,j,k)
-#else
-            adv_w_lat(i,j,k) = (                                            &
-              mf_lev_lat_n(i,j  ,k) * (w_lev_lat(i,j  ,k) - w_lev(i,j,k)) - &
-              mf_lev_lat_n(i,j-1,k) * (w_lev_lat(i,j-1,k) - w_lev(i,j,k))   &
-            ) / mesh%de_lat(j) / m_lev(i,j,k)
-#endif
+            #ifdef V_POLE
+              adv_w_lat(i,j,k) = (                                            &
+                mf_lev_lat_n(i,j+1,k) * (w_lev_lat(i,j+1,k) - w_lev(i,j,k)) - &
+                mf_lev_lat_n(i,j  ,k) * (w_lev_lat(i,j  ,k) - w_lev(i,j,k))   &
+              ) / mesh%de_lat(j) / m_lev(i,j,k)
+            #else
+              adv_w_lat(i,j,k) = (                                            &
+                mf_lev_lat_n(i,j  ,k) * (w_lev_lat(i,j  ,k) - w_lev(i,j,k)) - &
+                mf_lev_lat_n(i,j-1,k) * (w_lev_lat(i,j-1,k) - w_lev(i,j,k))   &
+              ) / mesh%de_lat(j) / m_lev(i,j,k)
+            #endif
           end do
         end do
       end do
-#ifndef V_POLE
-      if (mesh%has_south_pole()) then
-        j = mesh%full_lat_ibeg
-        pole = 0.0_r8
-        do k = mesh%full_lev_ibeg + 1, mesh%full_lev_iend - 1
-          do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-            pole(k) = pole(k) + mf_lev_lat_n(i,j,k) * (w_lev_lat(i,j,k) - w_lev(i,j,k))
+      #ifndef V_POLE
+        if (mesh%has_south_pole()) then
+          j = mesh%full_lat_ibeg
+          pole = 0.0_r8
+          do k = mesh%full_lev_ibeg + 1, mesh%full_lev_iend - 1 ! TODO k用half
+            do i = mesh%full_lon_ibeg, mesh%full_lon_iend
+              pole(k) = pole(k) + mf_lev_lat_n(i,j,k) * (w_lev_lat(i,j,k) - w_lev(i,j,k))
+            end do
           end do
-        end do
-        call zonal_sum(proc%zonal_comm, pole)
-        pole = pole * mesh%le_lat(j) / global_mesh%num_full_lon / mesh%area_cell(j)
-        do k = mesh%full_lev_ibeg + 1, mesh%full_lev_iend - 1
-          do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-            adv_w_lat(i,j,k) = pole(k) / m_lev(i,j,k) / global_mesh%num_full_lon
+          call zonal_sum(proc%zonal_comm, pole)
+          pole = pole * mesh%le_lat(j) / global_mesh%num_full_lon / mesh%area_cell(j)
+          do k = mesh%full_lev_ibeg + 1, mesh%full_lev_iend - 1 ! TODO k用half
+            do i = mesh%full_lon_ibeg, mesh%full_lon_iend
+              adv_w_lat(i,j,k) = pole(k) / m_lev(i,j,k) / global_mesh%num_full_lon
+            end do
           end do
-        end do
-      end if
-      if (mesh%has_north_pole()) then
-        j = mesh%full_lat_iend
-        pole = 0.0_r8
-        do k = mesh%full_lev_ibeg + 1, mesh%full_lev_iend - 1
-          do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-            pole(k) = pole(k) - mf_lev_lat_n(i,j-1,k) * (w_lev_lat(i,j-1,k) - w_lev(i,j,k))
+        end if
+        if (mesh%has_north_pole()) then
+          j = mesh%full_lat_iend
+          pole = 0.0_r8
+          do k = mesh%full_lev_ibeg + 1, mesh%full_lev_iend - 1 ! TODO k用half
+            do i = mesh%full_lon_ibeg, mesh%full_lon_iend
+              pole(k) = pole(k) - mf_lev_lat_n(i,j-1,k) * (w_lev_lat(i,j-1,k) - w_lev(i,j,k))
+            end do
           end do
-        end do
-        call zonal_sum(proc%zonal_comm, pole)
-        pole = pole * mesh%le_lat(j-1) / global_mesh%num_full_lon / mesh%area_cell(j)
-        do k = mesh%full_lev_ibeg + 1, mesh%full_lev_iend - 1
-          do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-            adv_w_lat(i,j,k) = pole(k) / m_lev(i,j,k) / global_mesh%num_full_lon
+          call zonal_sum(proc%zonal_comm, pole)
+          pole = pole * mesh%le_lat(j-1) / global_mesh%num_full_lon / mesh%area_cell(j)
+          do k = mesh%full_lev_ibeg + 1, mesh%full_lev_iend - 1 ! TODO k用half
+            do i = mesh%full_lon_ibeg, mesh%full_lon_iend
+              adv_w_lat(i,j,k) = pole(k) / m_lev(i,j,k) / global_mesh%num_full_lon
+            end do
           end do
-        end do
-      end if
-#endif
-
+        end if
+      #endif
+      ! 垂直对流（推公式存疑）
       do k = mesh%half_lev_ibeg + 1, mesh%half_lev_iend - 1
         a = mesh%half_dlev_upper(k) / mesh%half_dlev_lower(k)
         b = mesh%half_dlev_lower(k) / mesh%half_dlev_upper(k)
@@ -412,24 +422,24 @@ contains
       end do
       ! Top w is fixed to be zero.
       ! Bottom w is from boundary condition, so no tendency for it.
-#ifndef V_POLE
-      if (mesh%has_south_pole()) then
-        j = mesh%full_lat_ibeg
-        do k = mesh%full_lev_ibeg, mesh%full_lev_iend
-          do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-            adv_w_lev(i,j,k) = adv_w_lev(i,j,k) / global_mesh%num_full_lon
+      #ifndef V_POLE
+        if (mesh%has_south_pole()) then
+          j = mesh%full_lat_ibeg
+          do k = mesh%full_lev_ibeg, mesh%full_lev_iend ! TODO k用half
+            do i = mesh%full_lon_ibeg, mesh%full_lon_iend
+              adv_w_lev(i,j,k) = adv_w_lev(i,j,k) / global_mesh%num_full_lon
+            end do
           end do
-        end do
-      end if
-      if (mesh%has_north_pole()) then
-        j = mesh%full_lat_iend
-        do k = mesh%full_lev_ibeg, mesh%full_lev_iend
-          do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-            adv_w_lev(i,j,k) = adv_w_lev(i,j,k) / global_mesh%num_full_lon
+        end if
+        if (mesh%has_north_pole()) then
+          j = mesh%full_lat_iend
+          do k = mesh%full_lev_ibeg, mesh%full_lev_iend ! TODO k用half
+            do i = mesh%full_lon_ibeg, mesh%full_lon_iend
+              adv_w_lev(i,j,k) = adv_w_lev(i,j,k) / global_mesh%num_full_lon
+            end do
           end do
-        end do
-      end if
-#endif
+        end if
+      #endif
     end associate
 
   end subroutine calc_adv_w
@@ -564,11 +574,11 @@ contains
       do j = mesh%full_lat_ibeg_no_pole, mesh%full_lat_iend_no_pole
         do i = mesh%full_lon_ibeg, mesh%full_lon_iend
           us = a * (u(i-1,j,k-1) + u(i,j,k-1)) + b * (u(i-1,j,k-2) + u(i,j,k-2))
-#ifdef V_POLE
-          vs = a * (v(i,j+1,k-1) + v(i,j,k-1)) + b * (v(i,j+1,k-2) + v(i,j,k-2))
-#else
-          vs = a * (v(i,j-1,k-1) + v(i,j,k-1)) + b * (v(i,j-1,k-2) + v(i,j,k-2))
-#endif
+          #ifdef V_POLE
+            vs = a * (v(i,j+1,k-1) + v(i,j,k-1)) + b * (v(i,j+1,k-2) + v(i,j,k-2))
+          #else
+            vs = a * (v(i,j-1,k-1) + v(i,j,k-1)) + b * (v(i,j-1,k-2) + v(i,j,k-2))
+          #endif
           state%w_lev(i,j,k) = us * dzsdlon(i,j) + vs * dzsdlat(i,j)
         end do
       end do
@@ -576,7 +586,7 @@ contains
 
   end subroutine apply_bc_w_lev
 
-  subroutine implicit_w_solver(block, tend, old_state, new_state, dt)
+  subroutine implicit_w_solver(block, tend, old_state, new_state, dt) ! 应该不只有两个state，old=curr, new=next_sub，那last_sub呢？
 
     type(block_type), intent(in) :: block
     type(tend_type), intent(in) :: tend
@@ -643,15 +653,17 @@ contains
           ! Bottom boundary
           k = mesh%half_lev_iend
           w1(k) = w1(k) + gdt1mbeta * (old_p_lev(i,j,k) - old_p(i,j,k-1)) / old_m_lev(i,j,k)
+
           ! Use linearized state of ideal gas to calculate the first part of ∂pⁿ⁺¹ (i.e. dp1).
           do k = mesh%half_lev_ibeg + 1, mesh%half_lev_iend - 1
-            dp1 = (old_p(i,j,k) - old_p(i,j,k-1)) + cp_o_cv * ((                                     &
+            dp1 = (old_p(i,j,k) - old_p(i,j,k-1)) &
+            + cp_o_cv * ( (                                                                          &
               old_p(i,j,k  ) * new_m(i,j,k  ) * new_pt(i,j,k  ) / old_m(i,j,k  ) / old_pt(i,j,k  ) - &
               old_p(i,j,k-1) * new_m(i,j,k-1) * new_pt(i,j,k-1) / old_m(i,j,k-1) / old_pt(i,j,k-1)   &
             ) - (                                                                                    &
               old_p(i,j,k  ) * (gz1(k+1) - gz1(k  )) / dgz(k  ) -                                    &
               old_p(i,j,k-1) * (gz1(k  ) - gz1(k-1)) / dgz(k-1)                                      &
-            ))
+            ) )
             w1(k) = w1(k) + gdtbeta * dp1 / new_m_lev(i,j,k)
           end do
           ! Set coefficients for implicit solver.

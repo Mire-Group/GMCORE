@@ -62,11 +62,11 @@ contains
     call pgf_init()
     call damp_init()
 
-    select case (split_scheme)
+    select case (split_scheme)  ! 分裂方式
     case ('csp2')
-      splitter => csp2_splitting
+      splitter => csp2_splitting  ! 快满波分裂？
     case default
-      splitter => no_splitting
+      splitter => no_splitting  ! 不分裂
       if (is_root_proc()) call log_notice('No fast-slow split.')
     end select
 
@@ -104,15 +104,15 @@ contains
       end do
     end do
 
-    call operators_prepare(proc%blocks, old, dt_in_seconds)
+    call operators_prepare(proc%blocks, old, dt_in_seconds) ! 计算各项，为算总倾向服务
     call diagnose(proc%blocks, old)
     call output(old)
 
     do while (.not. time_is_finished())
-      call time_integrate(dt_in_seconds, proc%blocks)
+      call time_integrate(dt_in_seconds, proc%blocks) ! 内含总倾向的计算
       if (is_root_proc() .and. time_is_alerted('print')) call log_print_diag(curr_time%isoformat())
       call time_advance(dt_in_seconds)
-      call operators_prepare(proc%blocks, old, dt_in_seconds)
+      call operators_prepare(proc%blocks, old, dt_in_seconds) ! 计算各项，为算总倾向服务
       call diagnose(proc%blocks, old)
       call output(old)
     end do
@@ -264,8 +264,9 @@ contains
 
   end subroutine diagnose
 
-  subroutine space_operators(block, old_state, new_state, tend, dt, pass)
-
+  ! 计算总倾向，即方程中除时间偏导外的其它项之和
+  subroutine space_operators(block, old_state, new_state, tend, dt, pass) 
+    ! 目前非静力，传参pass==all_pass
     type(block_type), intent(inout) :: block
     type(state_type), intent(inout) :: old_state
     type(state_type), intent(inout) :: new_state
@@ -278,11 +279,11 @@ contains
 
     mesh => old_state%mesh
 
-    call tend%reset_flags()
+    call tend%reset_flags() ! update_u, update_v, update_phs, update_gz, update_pt, update_w全部置false
 
     select case (pass)
     case (all_pass)
-      if (hydrostatic) then
+      if (hydrostatic) then ! 静力：计算du dv 和 dpt
         call calc_dmfdlon_dmfdlat  (block, old_state, tend, dt)
         call calc_dphs             (block, old_state, tend, dt)
         call calc_wedphdlev_lev    (block, old_state, tend, dt)
@@ -319,13 +320,13 @@ contains
         tend%update_v   = .true.
         tend%update_phs = .true.
         tend%update_pt  = .true.
-      else if (nonhydrostatic) then
+      else if (nonhydrostatic) then ! 非静力：计算dpt，然后更新pt，再调用nh_solve
         call calc_dmfdlon_dmfdlat  (block, old_state, tend, dt)
-        call calc_dphs             (block, old_state, tend, dt)
+        call calc_dphs             (block, old_state, tend, dt) ! dphs是诊断计算得到的
         call calc_wedphdlev_lev    (block, old_state, tend, dt)
         call calc_dptfdlon_dptfdlat(block, old_state, tend, dt)
         call calc_dptfdlev         (block, old_state, tend, dt)
-
+        ! 计算dpt
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
           do j = mesh%full_lat_ibeg, mesh%full_lat_iend
             do i = mesh%full_lon_ibeg, mesh%full_lon_iend
@@ -336,23 +337,25 @@ contains
 
         tend%update_phs = .true.
         tend%update_pt  = .true.
-        call update_state(block, tend, old_state, new_state, dt, no_wind_pass)
+        
+        ! 更新phs和pt
+        call update_state(block, tend, old_state, new_state, dt, no_wind_pass) ! 注意非静力此处第一次调用update_state，不更新state的风场！！！
+        ! 调用非静力隐式求解w和gz
+        call nh_solve(block, tend, old_state, new_state, dt)  ! 求解w和gz，内含密度和压力的诊断
+        ! 准备水平速度方程需要的各项
+        call calc_qhu_qhv          (block, old_state, tend, dt) ! 计算科氏力
+        call calc_dkedlon_dkedlat  (block, old_state, tend, dt) ! 计算水平动能的水平对流
+        call calc_wedudlev_wedvdlev(block, old_state, tend, dt) ! 计算η'*du/dη和η'*dv/dη
 
-        call nh_solve(block, tend, old_state, new_state, dt)
-
-        call calc_qhu_qhv          (block, old_state, tend, dt)
-        call calc_dkedlon_dkedlat  (block, old_state, tend, dt)
-        call calc_wedudlev_wedvdlev(block, old_state, tend, dt)
-
-        call pgf_run               (block, new_state, tend)
-
+        call pgf_run               (block, new_state, tend)     ! 计算水平气压梯度力
+        ! 再计算du和dv
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
           do j = mesh%full_lat_ibeg_no_pole, mesh%full_lat_iend_no_pole
             do i = mesh%half_lon_ibeg, mesh%half_lon_iend
               tend%du(i,j,k) =   tend%qhv(i,j,k) - tend%pgf_lon(i,j,k) - tend%dkedlon(i,j,k) - tend%wedudlev(i,j,k)
             end do
           end do
-
+          
           do j = mesh%half_lat_ibeg_no_pole, mesh%half_lat_iend_no_pole
             do i = mesh%full_lon_ibeg, mesh%full_lon_iend
               tend%dv(i,j,k) = - tend%qhu(i,j,k) - tend%pgf_lat(i,j,k) - tend%dkedlat(i,j,k) - tend%wedvdlev(i,j,k)
@@ -360,11 +363,11 @@ contains
           end do
         end do
 
-        tend%update_u   = .true.
-        tend%update_v   = .true.
-        tend%update_phs = .false.
-        tend%update_pt  = .false.
-      else
+        tend%update_u   = .true.  ! 接下来需要更新u
+        tend%update_v   = .true.  ! 接下来需要更新v
+        tend%update_phs = .false. ! phs在之前已经更新过了，不必再算
+        tend%update_pt  = .false. ! pt在之前已经更新过了，不必再算
+      else  ! 正压?
         call calc_dmfdlon_dmfdlat(block, old_state, tend, dt)
         call calc_qhu_qhv        (block, old_state, tend, dt)
         call calc_dkedlon_dkedlat(block, old_state, tend, dt)
@@ -515,7 +518,7 @@ contains
     integer iblk
 
     do iblk = 1, size(blocks)
-      call splitter(dt, blocks(iblk))
+      call splitter(dt, blocks(iblk)) ! 时间分裂方式，真正的推进计算在这里面
 
       if (use_div_damp) then
         call div_damp_run(blocks(iblk), dt, blocks(iblk)%state(new))
@@ -563,7 +566,7 @@ contains
     real(8), intent(in) :: dt
     type(block_type), intent(inout) :: block
 
-    call time_integrator(space_operators, block, old, new, dt, all_pass)
+    call time_integrator(space_operators, block, old, new, dt, all_pass)  ! 不做分裂时用all_pass
 
   end subroutine no_splitting
 

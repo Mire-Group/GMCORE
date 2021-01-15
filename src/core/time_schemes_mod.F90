@@ -64,6 +64,8 @@ contains
 
   end subroutine time_scheme_init
 
+  ! 根据总倾向更新phs(进而计算ph和m), pt(需要用到m)，u，v
+  ! 如果是正压则不需更新phs和pt，只需更新gz
   subroutine update_state(block, tend, old_state, new_state, dt, pass)
 
     type(block_type), intent(inout) :: block
@@ -78,7 +80,8 @@ contains
 
     mesh => old_state%mesh
 
-    if (baroclinic) then
+    if (baroclinic) then  ! 斜压
+      ! 需要更新phs
       if (tend%update_phs) then
         do j = mesh%full_lat_ibeg, mesh%full_lat_iend
           do i = mesh%full_lon_ibeg, mesh%full_lon_iend
@@ -87,7 +90,7 @@ contains
         end do
         call fill_halo(block, new_state%phs, full_lon=.true., full_lat=.true.)
 
-        call diag_ph(block, new_state)
+        call diag_ph(block, new_state)  ! 更新phs之后可以立刻计算ph和m
         call diag_m (block, new_state)
       else if (tend%copy_phs) then
         new_state%phs    = old_state%phs
@@ -95,7 +98,7 @@ contains
         new_state%ph     = old_state%ph
         new_state%m      = old_state%m
       end if
-
+      ! 需要更新pt
       if (tend%update_pt) then
         if (.not. tend%update_phs .and. .not. tend%copy_phs .and. is_root_proc()) call log_error('Mass is not updated or copied!')
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
@@ -109,7 +112,7 @@ contains
       else if (tend%copy_pt) then
         new_state%pt = old_state%pt
       end if
-    else
+    else  ! 正压
       if (tend%update_gz) then
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
           do j = mesh%full_lat_ibeg, mesh%full_lat_iend
@@ -124,7 +127,8 @@ contains
       end if
     end if
 
-    if (tend%update_u) then
+    ! 需要更新u
+    if (tend%update_u) then 
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
         do j = mesh%full_lat_ibeg_no_pole, mesh%full_lat_iend_no_pole
           do i = mesh%half_lon_ibeg, mesh%half_lon_iend
@@ -134,7 +138,7 @@ contains
       end do
       call fill_halo(block, new_state%u, full_lon=.false., full_lat=.true., full_lev=.true.)
     end if
-
+    ! 需要更新v
     if (tend%update_v) then
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
         do j = mesh%half_lat_ibeg_no_pole, mesh%half_lat_iend_no_pole
@@ -146,7 +150,12 @@ contains
       call fill_halo(block, new_state%v, full_lon=.true., full_lat=.false., full_lev=.true.)
     end if
 
-    call operators_prepare(block, new_state, dt, pass)
+    ! 对于更新后的state: new_state
+    ! 调用operators_prepare_2，根据pass类型计算各小项，为计算总倾向服务
+    call operators_prepare(block, new_state, dt, pass)  
+    ! 非静力第一次调用update_state（从space_operators），更新了phs和pt，在这里的operators_prepare_2参数pass==no_wind_pass
+    ! 非静力第二次调用update_state（从time_integrator），更新了u和v，在这里的operators_prepare_2参数pass==all_pass，
+    ! 第二次相当于为下一个 RK substep的space_operators（去算总倾向）做准备
 
   end subroutine update_state
 
@@ -183,8 +192,8 @@ contains
 
     s1 = 3
     s2 = 4
-    s3 = new
-
+    s3 = new  ! 1:old, 2:new ?
+    ! space_operators 计算总倾向
     call space_operators(block, block%state(old), block%state(s1), block%tend(s1), 0.5_r8 * dt, pass)
     call update_state(block, block%tend(s1), block%state(old), block%state(s1), 0.5_r8 * dt, pass)
 
@@ -213,10 +222,12 @@ contains
     s2 = 4
     s3 = 5
     s4 = new
-
-    call space_operators(block, block%state(old), block%state(s1), block%tend(s1), 0.5_r8 * dt, pass)
-    call update_state(block, block%tend(s1), block%state(old), block%state(s1), 0.5_r8 * dt, pass)
-
+    ! space_operators 计算总倾向
+    !（如果是非静力的话，space_operators内计算dphs和dpt，调用phs、pt的update_state，再nh_solve来更新w和gz，最后计算du和dv，只剩下水平风场没更新）
+    call space_operators(block, block%state(old), block%state(s1), block%tend(s1), 0.5_r8 * dt, pass) ! 目前非静力这里pass==all_pass
+    ! 目前非静力这里update_state的参数pass==all_pass，内含的operators_prepare_2相当于为下一个RK substep的space_operators（去算总倾向）做准备
+    call update_state(block, block%tend(s1), block%state(old), block%state(s1), 0.5_r8 * dt, pass)    
+        
     call space_operators(block, block%state(s1), block%state(s2), block%tend(s2), 0.5_r8 * dt, pass)
     call update_state(block, block%tend(s2), block%state(old), block%state(s2), 0.5_r8 * dt, pass)
 
