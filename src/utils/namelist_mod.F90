@@ -170,6 +170,8 @@ contains
     write(*, *) 'num_lon             = ', to_str(num_lon)
     write(*, *) 'num_lat             = ', to_str(num_lat)
     write(*, *) 'num_lev             = ', to_str(num_lev)
+    write(*, *) 'num_proc_lon        = ', to_str(num_proc_lon)
+    write(*, *) 'num_proc_lat        = ', to_str(num_proc_lat)
     write(*, *) 'vert_coord_scheme   = ', trim(vert_coord_scheme)
     write(*, *) 'vert_coord_template = ', trim(vert_coord_template)
     write(*, *) 'dt_in_seconds       = ', to_str(int(dt_in_seconds))
@@ -189,6 +191,8 @@ contains
     write(*, *) 'use_rayleigh_damp   = ', to_str(use_rayleigh_damp)
     write(*, *) 'use_smag_damp       = ', to_str(use_smag_damp)
     write(*, *) 'smag_damp_coef      = ', to_str(smag_damp_coef, 1)
+    write(*, *) 'print_interval      = ', trim(print_interval)
+    write(*, *) 'history_interval    = ', trim(history_interval(1))
     write(*, *) '========================================================='
 
   end subroutine print_namelist

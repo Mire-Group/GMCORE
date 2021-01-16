@@ -12,7 +12,9 @@ module pa_mod
     logical pa_reduce_flag
     logical pa_flag
 
-    real*8    sub_time_start , sub_time_end , cal_time_start , cal_time_end , tran_time_start , tran_time_end ,step_time_start , step_time_end
+    real*8    sub_time_start , sub_time_end , cal_time_start , cal_time_end 
+    real*8    tran_time_start , tran_time_end ,step_time_start , step_time_end
+    real*8    wait_time_start , wait_time_end
     real*8    sub_time , cal_time , tran_time
 
 

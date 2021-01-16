@@ -86,6 +86,8 @@ module state_mod
     real(r8) tpe
     real(r8) tav
     type(async_type), allocatable :: async(:)
+
+    real(r8), allocatable, dimension(:,:,:) :: test          !test halo
   contains
     procedure :: init => state_init
     procedure :: clear => state_clear

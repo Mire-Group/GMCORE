@@ -87,6 +87,9 @@ contains
         end do
 
 #ifdef Detail_Time
+  call Get_Start_Time(wait_time_start)
+  call barrier()
+  call Get_End_Time(wait_time_end)
   call Get_Start_Time(tran_time_start)
 #endif
 
@@ -94,7 +97,7 @@ contains
 
 #ifdef Detail_Time
   call Get_End_Time(tran_time_end)
-  write((20000+myid),*) , 1 , tran_time_end - tran_time_start
+  write((20000+myid),*) , 1 , tran_time_end - tran_time_start , wait_time_end - wait_time_start
 #endif
 
         call calc_ph_lev_ph(block, new_state)
@@ -117,13 +120,17 @@ contains
         end do
 
 #ifdef Detail_Time
+  call Get_Start_Time(wait_time_start)
+  call barrier()
+  call Get_End_Time(wait_time_end)
   call Get_Start_Time(tran_time_start)
 #endif
+
         call fill_halo(block, new_state%pt, full_lon=.true., full_lat=.true., full_lev=.true.)
 
 #ifdef Detail_Time
   call Get_End_Time(tran_time_end)
-  write((20000+myid),*) , 2 , tran_time_end - tran_time_start
+  write((20000+myid),*) , 2 , tran_time_end - tran_time_start , wait_time_end - wait_time_start
 #endif
 
       else if (tend%copy_pt) then
@@ -140,6 +147,9 @@ contains
         end do
 
 #ifdef Detail_Time
+  call Get_Start_Time(wait_time_start)
+  call barrier()
+  call Get_End_Time(wait_time_end)
   call Get_Start_Time(tran_time_start)
 #endif
 
@@ -147,7 +157,7 @@ contains
 
 #ifdef Detail_Time
   call Get_End_Time(tran_time_end)
-  write((20000+myid),*) , 3 , tran_time_end - tran_time_start
+  write((20000+myid),*) , 3 , tran_time_end - tran_time_start , wait_time_end - wait_time_start
 #endif
 
       else if (tend%copy_gz) then
@@ -164,12 +174,15 @@ contains
         end do
       end do
 #ifdef Detail_Time
+  call Get_Start_Time(wait_time_start)
+  call barrier()
+  call Get_End_Time(wait_time_end)
   call Get_Start_Time(tran_time_start)
 #endif
       call fill_halo(block, new_state%u, full_lon=.false., full_lat=.true., full_lev=.true.)
 #ifdef Detail_Time
   call Get_End_Time(tran_time_end)
-  write((20000+myid),*) , 4 , tran_time_end - tran_time_start
+  write((20000+myid),*) , 4 , tran_time_end - tran_time_start , wait_time_end - wait_time_start
 #endif
     end if
 
@@ -182,12 +195,15 @@ contains
         end do
       end do
 #ifdef Detail_Time
-  call Get_Start_Time(tran_time_start)
+  call Get_Start_Time(wait_time_start)
+  call barrier()
+  call Get_End_Time(wait_time_end)
+  call Get_Start_Time(tran_time_start)  
 #endif
       call fill_halo(block, new_state%v, full_lon=.true., full_lat=.false., full_lev=.true.)
 #ifdef Detail_Time
   call Get_End_Time(tran_time_end)
-  write((20000+myid),*) , 5 , tran_time_end - tran_time_start
+  write((20000+myid),*) , 5 , tran_time_end - tran_time_start , wait_time_end - wait_time_start
 #endif
     end if
 

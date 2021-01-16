@@ -34,7 +34,7 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Intel")
   if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -no-wrap-margin -O0 -check bounds -g -traceback -mkl")
   else ()
-    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -xCORE-AVX2 -no-wrap-margin -O3 -align array64byte -mkl")
+    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -xCORE-AVX2 -fp-model precise -no-wrap-margin -O3 -align array64byte -mkl")
   endif ()
 endif ()
 

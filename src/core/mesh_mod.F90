@@ -636,7 +636,6 @@ contains
       end do
     end select
 
-    write(*,*) , this%full_lat_ibeg , this%full_lat_iend
 
     do j = this%full_lat_ibeg, this%full_lat_iend
       this%full_f(j) = 2.0_r8 * omega * this%full_sin_lat(j)

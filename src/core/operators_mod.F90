@@ -1,4 +1,4 @@
-!#define Detail_Time
+#define Detail_Time
 #define Ensure_Order
 module operators_mod
 
@@ -95,7 +95,7 @@ contains
       call calc_m                   (block, state)
       call calc_t                   (block, state)
       call pgf_prepare              (block, state)
-      call calc_m_lon_m_lat         (block, state)
+      call calc_m_lon_m_lat         (block, state) !need fillhalo
       call calc_mf_lon_n_mf_lat_n   (block, state)
       call calc_mf_lon_t_mf_lat_t   (block, state)
       call calc_ke                  (block, state)
@@ -133,6 +133,9 @@ contains
       end do
 
 #ifdef Detail_Time
+  call Get_Start_Time(wait_time_start)
+  call barrier()
+  call Get_End_Time(wait_time_end)
   call Get_Start_Time(tran_time_start)
 #endif
 
@@ -140,7 +143,7 @@ contains
 
 #ifdef Detail_Time
   call Get_End_Time(tran_time_end)
-  write((10000+myid),*) , 1 , tran_time_end - tran_time_start
+  write((10000+myid),*) , 1 , tran_time_end - tran_time_start , wait_time_end - wait_time_start
 #endif
 
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
@@ -152,6 +155,9 @@ contains
       end do
 
 #ifdef Detail_Time
+  call Get_Start_Time(wait_time_start)
+  call barrier()
+  call Get_End_Time(wait_time_end)
   call Get_Start_Time(tran_time_start)
 #endif
 
@@ -159,7 +165,7 @@ contains
 
 #ifdef Detail_Time
   call Get_End_Time(tran_time_end)
-  write((10000+myid),*) , 2 , tran_time_end - tran_time_start
+  write((10000+myid),*) , 2 , tran_time_end - tran_time_start , wait_time_end - wait_time_start
 #endif
 
     end if
@@ -186,6 +192,9 @@ contains
       end do
 
 #ifdef Detail_Time
+    call Get_Start_Time(wait_time_start)
+  call barrier()
+  call Get_End_Time(wait_time_end)
   call Get_Start_Time(tran_time_start)
 #endif
 
@@ -193,7 +202,7 @@ contains
 
 #ifdef Detail_Time
   call Get_End_Time(tran_time_end)
-  write((10000+myid),*) , 3 , tran_time_end - tran_time_start
+  write((10000+myid),*) , 3 , tran_time_end - tran_time_start , wait_time_end - wait_time_start
 #endif
 
     end if
@@ -273,6 +282,9 @@ contains
       state%wedphdlev_lev(:,:,mesh%half_lev_iend) = 0.0_r8
 
 #ifdef Detail_Time
+    call Get_Start_Time(wait_time_start)
+  call barrier()
+  call Get_End_Time(wait_time_end)
   call Get_Start_Time(tran_time_start)
 #endif
 
@@ -285,7 +297,7 @@ contains
 
 #ifdef Detail_Time
   call Get_End_Time(tran_time_end)
-  write((10000+myid),*) , 4 , tran_time_end - tran_time_start      
+  write((10000+myid),*) , 4 , tran_time_end - tran_time_start , wait_time_end - wait_time_start      
 #endif
 
       call interp_lev_edge_to_lev_lon_edge(mesh, state%wedphdlev_lev, state%wedphdlev_lev_lon)
@@ -378,6 +390,9 @@ contains
 #endif
 
 #ifdef Detail_Time
+    call Get_Start_Time(wait_time_start)
+  call barrier()
+  call Get_End_Time(wait_time_end)
   call Get_Start_Time(tran_time_start)
 #endif
 
@@ -394,7 +409,7 @@ contains
 
 #ifdef Detail_Time
   call Get_End_Time(tran_time_end)
-  write((10000+myid),*) , 5 , tran_time_end - tran_time_start
+  write((10000+myid),*) , 5 , tran_time_end - tran_time_start , wait_time_end - wait_time_start
 #endif
 
     if (div_damp_order == 4) then
@@ -412,6 +427,9 @@ contains
       end do
 
 #ifdef Detail_Time
+    call Get_Start_Time(wait_time_start)
+  call barrier()
+  call Get_End_Time(wait_time_end)
   call Get_Start_Time(tran_time_start)
 #endif
 
@@ -424,7 +442,7 @@ contains
 
 #ifdef Detail_Time
   call Get_End_Time(tran_time_end)
-  write((10000+myid),*) , 6 , tran_time_end - tran_time_start
+  write((10000+myid),*) , 6 , tran_time_end - tran_time_start , wait_time_end - wait_time_start
 #endif
 
     end if
@@ -456,6 +474,9 @@ contains
       end do
 
 #ifdef Detail_Time
+    call Get_Start_Time(wait_time_start)
+  call barrier()
+  call Get_End_Time(wait_time_end)
   call Get_Start_Time(tran_time_start)
 #endif
 
@@ -463,7 +484,7 @@ contains
 
 #ifdef Detail_Time
   call Get_End_Time(tran_time_end)
-  write((10000+myid),*) , 7 , tran_time_end - tran_time_start
+  write((10000+myid),*) , 7 , tran_time_end - tran_time_start , wait_time_end - wait_time_start
 #endif
 
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
@@ -476,6 +497,9 @@ contains
       end do
 
 #ifdef Detail_Time
+    call Get_Start_Time(wait_time_start)
+  call barrier()
+  call Get_End_Time(wait_time_end)
   call Get_Start_Time(tran_time_start)
 #endif
 
@@ -483,7 +507,7 @@ contains
 
 #ifdef Detail_Time
   call Get_End_Time(tran_time_end)
-  write((10000+myid),*) , 8 , tran_time_end - tran_time_start
+  write((10000+myid),*) , 8 , tran_time_end - tran_time_start , wait_time_end - wait_time_start
 #endif
 
     end if
@@ -524,6 +548,9 @@ contains
     end if
 
 #ifdef Detail_Time
+    call Get_Start_Time(wait_time_start)
+  call barrier()
+  call Get_End_Time(wait_time_end)
   call Get_Start_Time(tran_time_start)
 #endif
 
@@ -531,7 +558,7 @@ contains
 
 #ifdef Detail_Time
   call Get_End_Time(tran_time_end)
-  write((10000+myid),*) , 9 , tran_time_end - tran_time_start
+  write((10000+myid),*) , 9 , tran_time_end - tran_time_start , wait_time_end - wait_time_start
 #endif
 
   end subroutine calc_m
@@ -566,6 +593,9 @@ contains
       call interp_cell_to_lat_edge(mesh, state%pt, state%pt_lat, reversed_area=.true., v=state%v)
 
 #ifdef Detail_Time
+    call Get_Start_Time(wait_time_start)
+  call barrier()
+  call Get_End_Time(wait_time_end)
   call Get_Start_Time(tran_time_start)
 #endif
 
@@ -573,10 +603,13 @@ contains
 
 #ifdef Detail_Time
   call Get_End_Time(tran_time_end)
-  write((10000+myid),*) , 10 , tran_time_end - tran_time_start
+  write((10000+myid),*) , 10 , tran_time_end - tran_time_start , wait_time_end - wait_time_start
 #endif
 
 #ifdef Detail_Time
+    call Get_Start_Time(wait_time_start)
+  call barrier()
+  call Get_End_Time(wait_time_end)
   call Get_Start_Time(tran_time_start)
 #endif
 
@@ -589,7 +622,7 @@ contains
 
 #ifdef Detail_Time
   call Get_End_Time(tran_time_end)
-  write((10000+myid),*) , 11  ,tran_time_end - tran_time_start
+  write((10000+myid),*) , 11  ,tran_time_end - tran_time_start , wait_time_end - wait_time_start
 #endif
 
       call interp_cell_to_lev_edge(mesh, state%pt, state%pt_lev)
@@ -631,6 +664,9 @@ contains
     end do
 
 #ifdef Detail_Time
+    call Get_Start_Time(wait_time_start)
+  call barrier()
+  call Get_End_Time(wait_time_end)
   call Get_Start_Time(tran_time_start)
 #endif  
 
@@ -638,7 +674,7 @@ contains
 
 #ifdef Detail_Time
   call Get_End_Time(tran_time_end)
-  write((10000+myid),*) , 12  ,tran_time_end - tran_time_start
+  write((10000+myid),*) , 12  ,tran_time_end - tran_time_start , wait_time_end - wait_time_start
 #endif
 
     do k = mesh%full_lev_ibeg, mesh%full_lev_iend
@@ -650,6 +686,9 @@ contains
     end do
 
 #ifdef Detail_Time
+    call Get_Start_Time(wait_time_start)
+  call barrier()
+  call Get_End_Time(wait_time_end)
   call Get_Start_Time(tran_time_start)
 #endif
 
@@ -657,7 +696,7 @@ contains
 
 #ifdef Detail_Time
   call Get_End_Time(tran_time_end)
-  write((10000+myid),*) , 13  ,tran_time_end - tran_time_start
+  write((10000+myid),*) , 13  ,tran_time_end - tran_time_start , wait_time_end - wait_time_start
 #endif
 
   end subroutine calc_mf_lon_n_mf_lat_n

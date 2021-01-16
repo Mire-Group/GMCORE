@@ -9,7 +9,7 @@
   pv_scheme           = 1
   case_name           = 'rh..180x90'
   history_interval    = '1 days'
-  reduce_factors      = 9, 6, 4, 2
+  !reduce_factors      = 9, 6, 4, 2
   use_polar_damp      = .true.
   polar_damp_order    = 4
 /
