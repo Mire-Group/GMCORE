@@ -102,6 +102,8 @@ contains
 
   subroutine gmcore_run()
 
+    !try
+
     call operators_prepare(proc%blocks, old, dt_in_seconds)
     call diagnose(proc%blocks, old)
     call output(old)
