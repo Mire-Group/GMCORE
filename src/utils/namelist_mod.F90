@@ -85,6 +85,9 @@ module namelist_mod
   real(r8)      :: nest_lat_beg(20) = inf
   real(r8)      :: nest_lat_end(20) = inf
 
+  !member_num
+  integer       :: member_num = 1
+
   namelist /gmcore_control/     &
     case_name                 , &
     test_case                 , &
@@ -150,7 +153,8 @@ module namelist_mod
     nest_lon_beg              , &
     nest_lon_end              , &
     nest_lat_beg              , &
-    nest_lat_end
+    nest_lat_end              , &
+    member_num
 
 contains
 
@@ -193,6 +197,7 @@ contains
     write(*, *) 'smag_damp_coef      = ', to_str(smag_damp_coef, 1)
     write(*, *) 'print_interval      = ', trim(print_interval)
     write(*, *) 'history_interval    = ', trim(history_interval(1))
+    write(*, *) 'member_number       = ', to_str(member_num)
     write(*, *) '========================================================='
 
   end subroutine print_namelist

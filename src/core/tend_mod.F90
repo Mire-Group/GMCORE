@@ -17,11 +17,11 @@ module tend_mod
 
   type tend_type
     type(mesh_type), pointer :: mesh => null()
-    real(r8), allocatable, dimension(:,:,:) :: du
-    real(r8), allocatable, dimension(:,:,:) :: dv
-    real(r8), allocatable, dimension(:,:,:) :: dgz
-    real(r8), allocatable, dimension(:,:,:) :: dpt
-    real(r8), allocatable, dimension(:,:  ) :: dphs
+    real(r8), allocatable, dimension(:,:,:,:) :: du
+    real(r8), allocatable, dimension(:,:,:,:) :: dv
+    real(r8), allocatable, dimension(:,:,:,:) :: dgz
+    real(r8), allocatable, dimension(:,:,:,:) :: dpt
+    real(r8), allocatable, dimension(:,:,:  ) :: dphs
     logical :: updated_du   = .false.
     logical :: updated_dv   = .false.
     logical :: updated_dgz  = .false.
@@ -31,19 +31,19 @@ module tend_mod
     logical :: copy_pt  = .false.
     logical :: copy_phs = .false.
     ! Individual tendencies
-    real(r8), allocatable, dimension(:,:,:) :: qhv
-    real(r8), allocatable, dimension(:,:,:) :: qhu
-    real(r8), allocatable, dimension(:,:,:) :: dkedlon
-    real(r8), allocatable, dimension(:,:,:) :: dkedlat
-    real(r8), allocatable, dimension(:,:,:) :: dmfdlon
-    real(r8), allocatable, dimension(:,:,:) :: dmfdlat
-    real(r8), allocatable, dimension(:,:,:) :: dptfdlon ! Zonal potential temperature flux
-    real(r8), allocatable, dimension(:,:,:) :: dptfdlat ! Meridional potential temperature flux
-    real(r8), allocatable, dimension(:,:,:) :: dptfdlev ! Vertical potential temperature flux
-    real(r8), allocatable, dimension(:,:,:) :: pgf_lon
-    real(r8), allocatable, dimension(:,:,:) :: pgf_lat
-    real(r8), allocatable, dimension(:,:,:) :: wedudlev
-    real(r8), allocatable, dimension(:,:,:) :: wedvdlev
+    real(r8), allocatable, dimension(:,:,:,:) :: qhv
+    real(r8), allocatable, dimension(:,:,:,:) :: qhu
+    real(r8), allocatable, dimension(:,:,:,:) :: dkedlon
+    real(r8), allocatable, dimension(:,:,:,:) :: dkedlat
+    real(r8), allocatable, dimension(:,:,:,:) :: dmfdlon
+    real(r8), allocatable, dimension(:,:,:,:) :: dmfdlat
+    real(r8), allocatable, dimension(:,:,:,:) :: dptfdlon ! Zonal potential temperature flux
+    real(r8), allocatable, dimension(:,:,:,:) :: dptfdlat ! Meridional potential temperature flux
+    real(r8), allocatable, dimension(:,:,:,:) :: dptfdlev ! Vertical potential temperature flux
+    real(r8), allocatable, dimension(:,:,:,:) :: pgf_lon
+    real(r8), allocatable, dimension(:,:,:,:) :: pgf_lat
+    real(r8), allocatable, dimension(:,:,:,:) :: wedudlev
+    real(r8), allocatable, dimension(:,:,:,:) :: wedvdlev
   contains
     procedure :: init => tend_init
     procedure :: reset_flags => tend_reset_flags
@@ -69,33 +69,34 @@ module tend_mod
 
 contains
 
-  subroutine tend_init(this, mesh)
+  subroutine tend_init(this, mesh, member_num)
 
     class(tend_type), intent(inout)         :: this
     type(mesh_type ), intent(in   ), target :: mesh
+    integer , intent(in)  :: member_num 
 
     call this%clear()
 
     this%mesh => mesh
 
-    call allocate_array(mesh, this%du      , half_lon=.true., full_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%dv      , full_lon=.true., half_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%dgz     , full_lon=.true., full_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%dpt     , full_lon=.true., full_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%dphs    , full_lon=.true., full_lat=.true.                 )
-    call allocate_array(mesh, this%qhv     , half_lon=.true., full_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%qhu     , full_lon=.true., half_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%dkedlon , half_lon=.true., full_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%dkedlat , full_lon=.true., half_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%dmfdlon , full_lon=.true., full_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%dmfdlat , full_lon=.true., full_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%dptfdlon, full_lon=.true., full_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%dptfdlat, full_lon=.true., full_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%dptfdlev, full_lon=.true., full_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%pgf_lon , half_lon=.true., full_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%pgf_lat , full_lon=.true., half_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%wedudlev, half_lon=.true., full_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%wedvdlev, full_lon=.true., half_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%du      , member_num , half_lon=.true., full_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%dv      , member_num , full_lon=.true., half_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%dgz     , member_num , full_lon=.true., full_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%dpt     , member_num , full_lon=.true., full_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%dphs    , member_num , full_lon=.true., full_lat=.true.                 )
+    call allocate_array(mesh, this%qhv     , member_num , half_lon=.true., full_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%qhu     , member_num , full_lon=.true., half_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%dkedlon , member_num , half_lon=.true., full_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%dkedlat , member_num , full_lon=.true., half_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%dmfdlon , member_num , full_lon=.true., full_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%dmfdlat , member_num , full_lon=.true., full_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%dptfdlon, member_num , full_lon=.true., full_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%dptfdlat, member_num , full_lon=.true., full_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%dptfdlev, member_num , full_lon=.true., full_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%pgf_lon , member_num , half_lon=.true., full_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%pgf_lat , member_num , full_lon=.true., half_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%wedudlev, member_num , half_lon=.true., full_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%wedvdlev, member_num , full_lon=.true., half_lat=.true., full_lev=.true.)
 
   end subroutine tend_init
 

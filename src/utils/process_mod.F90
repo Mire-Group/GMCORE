@@ -66,6 +66,8 @@ module process_mod
     integer lat_iend
 
     logical NeedReduce
+    integer member_num
+
     type(process_neighbor_type), allocatable :: ngb(:) ! Neighbor processes
     type(block_type), allocatable :: blocks(:)
   end type process_type
@@ -89,6 +91,7 @@ contains
     call MPI_COMM_GROUP(proc%comm, proc%group, ierr)
 
     proc%NeedReduce = 0
+    proc%member_num = member_num
 
     call setup_mpi_1d_lat()
     call decompose_domains()
@@ -261,8 +264,10 @@ contains
 
     if (.not. allocated(proc%blocks)) allocate(proc%blocks(1))
 
-    call proc%blocks(1)%init(proc%id, global_mesh%lon_halo_width, global_mesh%lat_halo_width, &
+    call proc%blocks(1)%init(proc%id, member_num , global_mesh%lon_halo_width, global_mesh%lat_halo_width, &
                              proc%lon_ibeg, proc%lon_iend, proc%lat_ibeg, proc%lat_iend)
+
+    
 
     select case (r8)
     case (4)
@@ -281,11 +286,11 @@ contains
       select case (proc%ngb(i)%orient)
       case (west, east)
         call proc%blocks(1)%halo(i)%init(proc%blocks(1)%mesh, proc%ngb(i)%orient, dtype,               &
-                                         host_id=proc%id, ngb_proc_id=proc%ngb(i)%id,                  &
+                                         host_id=proc%id, ngb_proc_id=proc%ngb(i)%id, member_num = proc%member_num , &
                                          lat_ibeg=proc%ngb(i)%lat_ibeg, lat_iend=proc%ngb(i)%lat_iend)
       case (south, north)
         call proc%blocks(1)%halo(i)%init(proc%blocks(1)%mesh, proc%ngb(i)%orient, dtype,               &
-                                         host_id=proc%id, ngb_proc_id=proc%ngb(i)%id,                  &
+                                         host_id=proc%id, ngb_proc_id=proc%ngb(i)%id, member_num = proc%member_num , &
                                          lon_ibeg=proc%ngb(i)%lon_ibeg, lon_iend=proc%ngb(i)%lon_iend)
       end select
     end do

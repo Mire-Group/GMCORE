@@ -12,7 +12,7 @@ module static_mod
 
   type static_type
     type(mesh_type), pointer :: mesh => null()
-    real(r8), allocatable :: gzs(:,:)
+    real(r8), allocatable :: gzs(:,:,:)
   contains
     procedure :: init => static_init
     procedure :: clear => static_clear
@@ -21,16 +21,17 @@ module static_mod
 
 contains
 
-  subroutine static_init(this, mesh)
+  subroutine static_init(this, mesh, member_num)
 
     class(static_type), intent(inout)         :: this
     type(mesh_type   ), intent(in   ), target :: mesh
+    integer , intent(in) :: member_num
 
     call this%clear()
 
     this%mesh => mesh
 
-    call allocate_array(mesh, this%gzs, full_lon=.true., full_lat=.true.)
+    call allocate_array(mesh, this%gzs, member_num , full_lon=.true., full_lat=.true.)
 
   end subroutine static_init
 

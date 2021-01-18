@@ -99,10 +99,10 @@ contains
       do j = blocks(iblk)%mesh%full_lat_ibeg - 1, blocks(iblk)%mesh%full_lat_iend + 1
         if (blocks(iblk)%reduced_mesh(j)%reduce_factor > 0) then
           blocks(iblk)%NeedReduce = .true.
-          call allocate_reduced_static(blocks(iblk)%reduced_mesh(j), blocks(iblk)%reduced_static(j))
+          call allocate_reduced_static(blocks(iblk)%reduced_mesh(j), blocks(iblk)%reduced_static(j),member_num)
           call reduce_static(j, blocks(iblk), blocks(iblk)%mesh, blocks(iblk)%static, blocks(iblk)%reduced_mesh(j), blocks(iblk)%reduced_static(j))
-          call allocate_reduced_state(blocks(iblk)%reduced_mesh(j), blocks(iblk)%reduced_state(j))
-          call allocate_reduced_tend(blocks(iblk)%reduced_mesh(j), blocks(iblk)%reduced_tend(j))
+          call allocate_reduced_state(blocks(iblk)%reduced_mesh(j), blocks(iblk)%reduced_state(j),member_num)
+          call allocate_reduced_tend(blocks(iblk)%reduced_mesh(j), blocks(iblk)%reduced_tend(j),member_num)
         end if
       end do
     end do
@@ -286,72 +286,73 @@ contains
 
   end subroutine reduce_mesh
 
-  subroutine allocate_reduced_state(reduced_mesh, reduced_state)
+  subroutine allocate_reduced_state(reduced_mesh, reduced_state , member_num)
 
     type(reduced_mesh_type), intent(in) :: reduced_mesh
     type(reduced_state_type), intent(inout) :: reduced_state
+    integer , intent(in) :: member_num
 
     integer is, ie, ks, ke, i1, i2, i3
 
-#define full_lev_full_lon_dims(x, buf_bound) reduced_state%x(reduced_mesh%full_lev_lb:reduced_mesh%full_lev_ub,reduced_mesh%full_lon_lb:reduced_mesh%full_lon_ub,buf_bound,reduced_mesh%reduce_factor)
-#define full_lev_half_lon_dims(x, buf_bound) reduced_state%x(reduced_mesh%full_lev_lb:reduced_mesh%full_lev_ub,reduced_mesh%half_lon_lb:reduced_mesh%half_lon_ub,buf_bound,reduced_mesh%reduce_factor)
-#define half_lev_full_lon_dims(x, buf_bound) reduced_state%x(reduced_mesh%half_lev_lb:reduced_mesh%half_lev_ub,reduced_mesh%full_lon_lb:reduced_mesh%full_lon_ub,buf_bound,reduced_mesh%reduce_factor)
+#define full_lev_full_lon_dims(x, buf_bound) reduced_state%x(member_num, reduced_mesh%full_lev_lb:reduced_mesh%full_lev_ub,reduced_mesh%full_lon_lb:reduced_mesh%full_lon_ub,buf_bound,reduced_mesh%reduce_factor)
+#define full_lev_half_lon_dims(x, buf_bound) reduced_state%x(member_num, reduced_mesh%full_lev_lb:reduced_mesh%full_lev_ub,reduced_mesh%half_lon_lb:reduced_mesh%half_lon_ub,buf_bound,reduced_mesh%reduce_factor)
+#define half_lev_full_lon_dims(x, buf_bound) reduced_state%x(member_num, reduced_mesh%half_lev_lb:reduced_mesh%half_lev_ub,reduced_mesh%full_lon_lb:reduced_mesh%full_lon_ub,buf_bound,reduced_mesh%reduce_factor)
 
 #ifdef V_POLE
-    if (baroclinic .and. hydrostatic) then
-      allocate(full_lev_half_lon_dims(mf_lon_n     , -2:2))
-      allocate(full_lev_half_lon_dims(mf_lon_t     ,  0:0))
-      allocate(full_lev_full_lon_dims(mf_lat_n     , -1:2))
-      allocate(full_lev_full_lon_dims(mf_lat_t     ,  0:1))
-      allocate(full_lev_full_lon_dims(m            , -2:2))
-      allocate(full_lev_half_lon_dims(m_lon        , -2:2))
-      allocate(full_lev_full_lon_dims(m_lat        , -1:2))
-      allocate(full_lev_half_lon_dims(u            , -2:2))
-      allocate(full_lev_full_lon_dims(v            , -1:2))
-      allocate(full_lev_half_lon_dims(pv           , -1:2))
-      allocate(full_lev_half_lon_dims(pv_lon       ,  0:0))
-      allocate(full_lev_full_lon_dims(pv_lat       ,  0:1))
-      allocate(full_lev_half_lon_dims(dpv_lon_n    ,  0:0))
-      allocate(full_lev_full_lon_dims(dpv_lon_t    , -1:1))
-      allocate(full_lev_full_lon_dims(dpv_lat_n    ,  0:1))
-      allocate(full_lev_half_lon_dims(dpv_lat_t    ,  0:1))
-      allocate(full_lev_full_lon_dims(ke           ,  0:0))
-      allocate(full_lev_full_lon_dims(gz           ,  0:0))
-      allocate(full_lev_full_lon_dims(pt           ,  0:0))
-      allocate(full_lev_half_lon_dims(pt_lon       ,  0:0))
-      allocate(full_lev_half_lon_dims(ptf_lon      ,  0:0))
-      allocate(full_lev_full_lon_dims(ph           ,  0:0))
-      allocate(half_lev_full_lon_dims(ph_lev       ,  0:0))
-      allocate(full_lev_full_lon_dims(t            ,  0:0))
-      if (pgf_scheme == 'sb81') then
-        allocate(full_lev_full_lon_dims(ak         ,  0:0))
-        allocate(full_lev_half_lon_dims(t_lnpop_lon,  0:0))
-        allocate(full_lev_half_lon_dims(ak_t_lon   ,  0:0))
-      else if (pgf_scheme == 'lin97') then
-        allocate(half_lev_full_lon_dims(gz_lev     ,  0:0))
-      end if
-    else if (baroclinic .and. .not. hydrostatic) then
+    ! if (baroclinic .and. hydrostatic) then
+    !   allocate(full_lev_half_lon_dims(mf_lon_n     , -2:2))
+    !   allocate(full_lev_half_lon_dims(mf_lon_t     ,  0:0))
+    !   allocate(full_lev_full_lon_dims(mf_lat_n     , -1:2))
+    !   allocate(full_lev_full_lon_dims(mf_lat_t     ,  0:1))
+    !   allocate(full_lev_full_lon_dims(m            , -2:2))
+    !   allocate(full_lev_half_lon_dims(m_lon        , -2:2))
+    !   allocate(full_lev_full_lon_dims(m_lat        , -1:2))
+    !   allocate(full_lev_half_lon_dims(u            , -2:2))
+    !   allocate(full_lev_full_lon_dims(v            , -1:2))
+    !   allocate(full_lev_half_lon_dims(pv           , -1:2))
+    !   allocate(full_lev_half_lon_dims(pv_lon       ,  0:0))
+    !   allocate(full_lev_full_lon_dims(pv_lat       ,  0:1))
+    !   allocate(full_lev_half_lon_dims(dpv_lon_n    ,  0:0))
+    !   allocate(full_lev_full_lon_dims(dpv_lon_t    , -1:1))
+    !   allocate(full_lev_full_lon_dims(dpv_lat_n    ,  0:1))
+    !   allocate(full_lev_half_lon_dims(dpv_lat_t    ,  0:1))
+    !   allocate(full_lev_full_lon_dims(ke           ,  0:0))
+    !   allocate(full_lev_full_lon_dims(gz           ,  0:0))
+    !   allocate(full_lev_full_lon_dims(pt           ,  0:0))
+    !   allocate(full_lev_half_lon_dims(pt_lon       ,  0:0))
+    !   allocate(full_lev_half_lon_dims(ptf_lon      ,  0:0))
+    !   allocate(full_lev_full_lon_dims(ph           ,  0:0))
+    !   allocate(half_lev_full_lon_dims(ph_lev       ,  0:0))
+    !   allocate(full_lev_full_lon_dims(t            ,  0:0))
+    !   if (pgf_scheme == 'sb81') then
+    !     allocate(full_lev_full_lon_dims(ak         ,  0:0))
+    !     allocate(full_lev_half_lon_dims(t_lnpop_lon,  0:0))
+    !     allocate(full_lev_half_lon_dims(ak_t_lon   ,  0:0))
+    !   else if (pgf_scheme == 'lin97') then
+    !     allocate(half_lev_full_lon_dims(gz_lev     ,  0:0))
+    !   end if
+    ! else if (baroclinic .and. .not. hydrostatic) then
 
-    else
-      allocate(full_lev_half_lon_dims(mf_lon_n     , -2:2))
-      allocate(full_lev_half_lon_dims(mf_lon_t     ,  0:0))
-      allocate(full_lev_full_lon_dims(mf_lat_n     , -1:2))
-      allocate(full_lev_full_lon_dims(mf_lat_t     ,  0:1))
-      allocate(full_lev_full_lon_dims(gz           , -2:2))
-      allocate(full_lev_full_lon_dims(m            , -2:2))
-      allocate(full_lev_half_lon_dims(m_lon        , -2:2))
-      allocate(full_lev_full_lon_dims(m_lat        , -1:2))
-      allocate(full_lev_half_lon_dims(u            , -2:2))
-      allocate(full_lev_full_lon_dims(v            , -1:2))
-      allocate(full_lev_half_lon_dims(pv           , -1:2))
-      allocate(full_lev_half_lon_dims(pv_lon       ,  0:0))
-      allocate(full_lev_full_lon_dims(pv_lat       ,  0:1))
-      allocate(full_lev_full_lon_dims(dpv_lon_n    ,  0:0))
-      allocate(full_lev_full_lon_dims(dpv_lon_t    , -1:1))
-      allocate(full_lev_half_lon_dims(dpv_lat_n    ,  0:1))
-      allocate(full_lev_half_lon_dims(dpv_lat_t    ,  0:1))
-      allocate(full_lev_full_lon_dims(ke           ,  0:0))
-    end if
+    ! else
+    !   allocate(full_lev_half_lon_dims(mf_lon_n     , -2:2))
+    !   allocate(full_lev_half_lon_dims(mf_lon_t     ,  0:0))
+    !   allocate(full_lev_full_lon_dims(mf_lat_n     , -1:2))
+    !   allocate(full_lev_full_lon_dims(mf_lat_t     ,  0:1))
+    !   allocate(full_lev_full_lon_dims(gz           , -2:2))
+    !   allocate(full_lev_full_lon_dims(m            , -2:2))
+    !   allocate(full_lev_half_lon_dims(m_lon        , -2:2))
+    !   allocate(full_lev_full_lon_dims(m_lat        , -1:2))
+    !   allocate(full_lev_half_lon_dims(u            , -2:2))
+    !   allocate(full_lev_full_lon_dims(v            , -1:2))
+    !   allocate(full_lev_half_lon_dims(pv           , -1:2))
+    !   allocate(full_lev_half_lon_dims(pv_lon       ,  0:0))
+    !   allocate(full_lev_full_lon_dims(pv_lat       ,  0:1))
+    !   allocate(full_lev_full_lon_dims(dpv_lon_n    ,  0:0))
+    !   allocate(full_lev_full_lon_dims(dpv_lon_t    , -1:1))
+    !   allocate(full_lev_half_lon_dims(dpv_lat_n    ,  0:1))
+    !   allocate(full_lev_half_lon_dims(dpv_lat_t    ,  0:1))
+    !   allocate(full_lev_full_lon_dims(ke           ,  0:0))
+    ! end if
 #else
     if (baroclinic .and. hydrostatic) then
       allocate(full_lev_half_lon_dims(mf_lon_n     , -2:2))
@@ -1459,37 +1460,39 @@ contains
 
   end subroutine reduce_append_array
 
-  subroutine allocate_reduced_static(reduced_mesh, reduced_static)
+  subroutine allocate_reduced_static(reduced_mesh, reduced_static , member_num)
 
     type(reduced_mesh_type), intent(in) :: reduced_mesh
     type(reduced_static_type), intent(inout) :: reduced_static
+    integer , intent(in) :: member_num
 
-    allocate(reduced_static%gzs(reduced_mesh%full_lon_lb:reduced_mesh%full_lon_ub, -2:2,reduced_mesh%reduce_factor))
+    allocate(reduced_static%gzs(member_num , reduced_mesh%full_lon_lb:reduced_mesh%full_lon_ub, -2:2,reduced_mesh%reduce_factor))
 
   end subroutine allocate_reduced_static
 
-  subroutine allocate_reduced_tend(reduced_mesh, reduced_tend)
+  subroutine allocate_reduced_tend(reduced_mesh, reduced_tend, member_num)
 
     type(reduced_mesh_type), intent(in) :: reduced_mesh
     type(reduced_tend_type), intent(inout) :: reduced_tend
+    integer , intent(in) :: member_num
 
     integer is, ie, ks, ke
 
     is = reduced_mesh%full_lon_lb; ie = reduced_mesh%full_lon_ub
     ks = reduced_mesh%full_lev_lb; ke = reduced_mesh%full_lev_ub
 
-    allocate(reduced_tend%qhu     (is:ie,ks:ke))
-    allocate(reduced_tend%fu      (is:ie,ks:ke))
-    allocate(reduced_tend%dmfdlon (is:ie,ks:ke))
-    allocate(reduced_tend%dptfdlon(is:ie,ks:ke))
+    allocate(reduced_tend%qhu     (member_num,is:ie,ks:ke))
+    allocate(reduced_tend%fu      (member_num,is:ie,ks:ke))
+    allocate(reduced_tend%dmfdlon (member_num,is:ie,ks:ke))
+    allocate(reduced_tend%dptfdlon(member_num,is:ie,ks:ke))
 
     is = reduced_mesh%half_lon_lb; ie = reduced_mesh%half_lon_ub
     ks = reduced_mesh%full_lev_lb; ke = reduced_mesh%full_lev_ub
 
-    allocate(reduced_tend%qhv     (is:ie,ks:ke))
-    allocate(reduced_tend%fv      (is:ie,ks:ke))
-    allocate(reduced_tend%pgf_lon (is:ie,ks:ke))
-    allocate(reduced_tend%dkedlon (is:ie,ks:ke))
+    allocate(reduced_tend%qhv     (member_num,is:ie,ks:ke))
+    allocate(reduced_tend%fv      (member_num,is:ie,ks:ke))
+    allocate(reduced_tend%pgf_lon (member_num,is:ie,ks:ke))
+    allocate(reduced_tend%dkedlon (member_num,is:ie,ks:ke))
 
   end subroutine allocate_reduced_tend
 

@@ -48,6 +48,7 @@ module block_mod
     type(reduced_tend_type), allocatable :: reduced_tend(:)
     type(halo_type), allocatable :: halo(:)
     logical NeedReduce
+    integer member_num
   contains
     procedure :: init => block_init
     final :: block_final
@@ -55,10 +56,11 @@ module block_mod
 
 contains
 
-  subroutine block_init(this, id, lon_halo_width, lat_halo_width, lon_ibeg, lon_iend, lat_ibeg, lat_iend)
+  subroutine block_init(this, id, member_num , lon_halo_width, lat_halo_width, lon_ibeg, lon_iend, lat_ibeg, lat_iend)
 
     class(block_type), intent(inout) :: this
     integer, intent(in) :: id
+    integer, intent(in) :: member_num
     integer, intent(in) :: lon_halo_width
     integer, intent(in) :: lat_halo_width
     integer, intent(in) :: lon_ibeg
@@ -69,6 +71,7 @@ contains
     integer i
 
     this%id = id
+    this%member_num = member_num
 
     call this%mesh%init_from_parent(global_mesh, this%id, lon_halo_width, lat_halo_width, lon_ibeg, lon_iend, lat_ibeg, lat_iend)
     
@@ -89,10 +92,10 @@ contains
         if (id == 0) call log_error('Unknown time scheme ' // trim(time_scheme))
       end select
       do i = 1, size(this%state)
-        call this%state(i)%init(this%mesh)
-        call this%tend (i)%init(this%mesh)
+        call this%state(i)%init(this%mesh , member_num)
+        call this%tend (i)%init(this%mesh , member_num)
       end do
-      call this%static%init(this%mesh)
+      call this%static%init(this%mesh , member_num)
     end if
 
   end subroutine block_init

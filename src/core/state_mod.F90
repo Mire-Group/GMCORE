@@ -20,71 +20,71 @@ module state_mod
     ! For nesting
     integer :: id = 0
     type(state_type), pointer :: parent => null()
-    real(r8), allocatable, dimension(:,:,:) :: u             ! Zonal wind speed (m s-1)
-    real(r8), allocatable, dimension(:,:,:) :: u850          ! Zonal wind speed on 850hPa
-    real(r8), allocatable, dimension(:,:,:) :: u700          ! Zonal wind speed on 700hPa
-    real(r8), allocatable, dimension(:,:,:) :: v             ! Meridional wind speed (m s-1)
-    real(r8), allocatable, dimension(:,:,:) :: v850          ! Meridional wind speed on 850hPa
-    real(r8), allocatable, dimension(:,:,:) :: v700          ! Meridional wind speed on 700hPa
-    real(r8), allocatable, dimension(:,:,:) :: w             ! Vertical wind speed
-    real(r8), allocatable, dimension(:,:,:) :: wp            ! ω = dp / dt (Pa s-1)
-    real(r8), allocatable, dimension(:,:,:) :: wedphdlev_lev     ! Vertical coordinate speed multiplied by 𝛛π/𝛛η
-    real(r8), allocatable, dimension(:,:,:) :: wedphdlev_lev_lon ! Vertical coordinate speed multiplied by 𝛛π/𝛛η on zonal edge
-    real(r8), allocatable, dimension(:,:,:) :: wedphdlev_lev_lat ! Vertical coordinate speed multiplied by 𝛛π/𝛛η on merdional edge
-    real(r8), allocatable, dimension(:,:,:) :: gz            ! Geopotential (m2 s-2)
-    real(r8), allocatable, dimension(:,:,:) :: gz_p          ! Perturbed geopotential (m2 s-2)
-    real(r8), allocatable, dimension(:,:,:) :: gz_lev        ! Geopotential height on half levels (m2 s-2)
-    real(r8), allocatable, dimension(:,:,:) :: m             ! Mass
-    real(r8), allocatable, dimension(:,:,:) :: m_vtx         ! Mass on vertex
-    real(r8), allocatable, dimension(:,:,:) :: m_lon         ! Mass on zonal edge
-    real(r8), allocatable, dimension(:,:,:) :: m_lat         ! Mass on merdional edge
-    real(r8), allocatable, dimension(:,:,:) :: mf_lon_n      ! Normal mass flux on zonal edge
-    real(r8), allocatable, dimension(:,:,:) :: mf_lat_n      ! Normal mass flux on merdional edge
-    real(r8), allocatable, dimension(:,:,:) :: mf_lat_t      ! Tangient mass flux on zonal edge
-    real(r8), allocatable, dimension(:,:,:) :: mf_lon_t      ! Tangient mass flux on merdional edge
-    real(r8), allocatable, dimension(:,:,:) :: pv            ! Potential vorticity
-    real(r8), allocatable, dimension(:,:,:) :: pv_lon        ! Potential vorticity on zonal edge
-    real(r8), allocatable, dimension(:,:,:) :: pv_lat        ! Potential vorticity on merdional edge
-    real(r8), allocatable, dimension(:,:,:) :: dpv_lon_t     ! Meridional potential vorticity difference on zonal edge
-    real(r8), allocatable, dimension(:,:,:) :: dpv_lon_n     ! Zonal potential vorticity difference on zonal edge
-    real(r8), allocatable, dimension(:,:,:) :: dpv_lat_t     ! Zonal potential vorticity difference on merdional edge
-    real(r8), allocatable, dimension(:,:,:) :: dpv_lat_n     ! Meridional potential vorticity difference on merdional edge
-    real(r8), allocatable, dimension(:,:,:) :: ke            ! Kinetic energy
-    real(r8), allocatable, dimension(:,:,:) :: pt            ! Potential temperature
-    real(r8), allocatable, dimension(:,:,:) :: pt_lon        ! Potential temperature on the zonal edge
-    real(r8), allocatable, dimension(:,:,:) :: pt_lat        ! Potential temperature on the merdional edge
-    real(r8), allocatable, dimension(:,:,:) :: pt_lev        ! Potential temperature on the vertical edge
-    real(r8), allocatable, dimension(:,:,:) :: pt_p          ! Perturbed potential temperature
-    real(r8), allocatable, dimension(:,:,:) :: t             ! Temperature
-    real(r8), allocatable, dimension(:,:  ) :: t850          ! Temperature on 850hPa
-    real(r8), allocatable, dimension(:,:  ) :: t700          ! Temperature on 700hPa
-    real(r8), allocatable, dimension(:,:,:) :: t_lnpop       ! T ln(p_{k+1/2} / p_{k-1/2})
-    real(r8), allocatable, dimension(:,:,:) :: t_lnpop_lon   ! T ln(p_{k+1/2} / p_{k-1/2})
-    real(r8), allocatable, dimension(:,:,:) :: t_lnpop_lat   ! T ln(p_{k+1/2} / p_{k-1/2})
-    real(r8), allocatable, dimension(:,:,:) :: ak_t          ! ak T
-    real(r8), allocatable, dimension(:,:,:) :: ak_t_lon      ! ak T
-    real(r8), allocatable, dimension(:,:,:) :: ak_t_lat      ! ak T
-    real(r8), allocatable, dimension(:,:,:) :: p             ! Pressure on full levels
-    real(r8), allocatable, dimension(:,:,:) :: p_p           ! Perturbed pressure on full levels
-    real(r8), allocatable, dimension(:,:,:) :: p_lev         ! Pressure on half levels
-    real(r8), allocatable, dimension(:,:,:) :: ph            ! Hydrostatic pressure on full levels
-    real(r8), allocatable, dimension(:,:,:) :: ph_lev        ! Hydrostatic pressure on half levels
-    real(r8), allocatable, dimension(:,:  ) :: phs           ! Surface hydrostatic pressure
-    real(r8), allocatable, dimension(:,:,:) :: ak            ! Coefficient for calculate gz on full levels
-    real(r8), allocatable, dimension(:,:,:) :: div           ! Divergence (s-1)
-    real(r8), allocatable, dimension(:,:,:) :: div2          ! Laplacian of divergence (s-1)
-    real(r8), allocatable, dimension(:,:,:) :: vor           ! Vorticity (s-1)
+    real(r8), allocatable, dimension(:,:,:,:) :: u             ! Zonal wind speed (m s-1)
+    real(r8), allocatable, dimension(:,:,:,:) :: u850          ! Zonal wind speed on 850hPa
+    real(r8), allocatable, dimension(:,:,:,:) :: u700          ! Zonal wind speed on 700hPa
+    real(r8), allocatable, dimension(:,:,:,:) :: v             ! Meridional wind speed (m s-1)
+    real(r8), allocatable, dimension(:,:,:,:) :: v850          ! Meridional wind speed on 850hPa
+    real(r8), allocatable, dimension(:,:,:,:) :: v700          ! Meridional wind speed on 700hPa
+    real(r8), allocatable, dimension(:,:,:,:) :: w             ! Vertical wind speed
+    real(r8), allocatable, dimension(:,:,:,:) :: wp            ! ω = dp / dt (Pa s-1)
+    real(r8), allocatable, dimension(:,:,:,:) :: wedphdlev_lev     ! Vertical coordinate speed multiplied by 𝛛π/𝛛η
+    real(r8), allocatable, dimension(:,:,:,:) :: wedphdlev_lev_lon ! Vertical coordinate speed multiplied by 𝛛π/𝛛η on zonal edge
+    real(r8), allocatable, dimension(:,:,:,:) :: wedphdlev_lev_lat ! Vertical coordinate speed multiplied by 𝛛π/𝛛η on merdional edge
+    real(r8), allocatable, dimension(:,:,:,:) :: gz            ! Geopotential (m2 s-2)
+    real(r8), allocatable, dimension(:,:,:,:) :: gz_p          ! Perturbed geopotential (m2 s-2)
+    real(r8), allocatable, dimension(:,:,:,:) :: gz_lev        ! Geopotential height on half levels (m2 s-2)
+    real(r8), allocatable, dimension(:,:,:,:) :: m             ! Mass
+    real(r8), allocatable, dimension(:,:,:,:) :: m_vtx         ! Mass on vertex
+    real(r8), allocatable, dimension(:,:,:,:) :: m_lon         ! Mass on zonal edge
+    real(r8), allocatable, dimension(:,:,:,:) :: m_lat         ! Mass on merdional edge
+    real(r8), allocatable, dimension(:,:,:,:) :: mf_lon_n      ! Normal mass flux on zonal edge
+    real(r8), allocatable, dimension(:,:,:,:) :: mf_lat_n      ! Normal mass flux on merdional edge
+    real(r8), allocatable, dimension(:,:,:,:) :: mf_lat_t      ! Tangient mass flux on zonal edge
+    real(r8), allocatable, dimension(:,:,:,:) :: mf_lon_t      ! Tangient mass flux on merdional edge
+    real(r8), allocatable, dimension(:,:,:,:) :: pv            ! Potential vorticity
+    real(r8), allocatable, dimension(:,:,:,:) :: pv_lon        ! Potential vorticity on zonal edge
+    real(r8), allocatable, dimension(:,:,:,:) :: pv_lat        ! Potential vorticity on merdional edge
+    real(r8), allocatable, dimension(:,:,:,:) :: dpv_lon_t     ! Meridional potential vorticity difference on zonal edge
+    real(r8), allocatable, dimension(:,:,:,:) :: dpv_lon_n     ! Zonal potential vorticity difference on zonal edge
+    real(r8), allocatable, dimension(:,:,:,:) :: dpv_lat_t     ! Zonal potential vorticity difference on merdional edge
+    real(r8), allocatable, dimension(:,:,:,:) :: dpv_lat_n     ! Meridional potential vorticity difference on merdional edge
+    real(r8), allocatable, dimension(:,:,:,:) :: ke            ! Kinetic energy
+    real(r8), allocatable, dimension(:,:,:,:) :: pt            ! Potential temperature
+    real(r8), allocatable, dimension(:,:,:,:) :: pt_lon        ! Potential temperature on the zonal edge
+    real(r8), allocatable, dimension(:,:,:,:) :: pt_lat        ! Potential temperature on the merdional edge
+    real(r8), allocatable, dimension(:,:,:,:) :: pt_lev        ! Potential temperature on the vertical edge
+    real(r8), allocatable, dimension(:,:,:,:) :: pt_p          ! Perturbed potential temperature
+    real(r8), allocatable, dimension(:,:,:,:) :: t             ! Temperature
+    real(r8), allocatable, dimension(:,:,:  ) :: t850          ! Temperature on 850hPa
+    real(r8), allocatable, dimension(:,:,:  ) :: t700          ! Temperature on 700hPa
+    real(r8), allocatable, dimension(:,:,:,:) :: t_lnpop       ! T ln(p_{k+1/2} / p_{k-1/2})
+    real(r8), allocatable, dimension(:,:,:,:) :: t_lnpop_lon   ! T ln(p_{k+1/2} / p_{k-1/2})
+    real(r8), allocatable, dimension(:,:,:,:) :: t_lnpop_lat   ! T ln(p_{k+1/2} / p_{k-1/2})
+    real(r8), allocatable, dimension(:,:,:,:) :: ak_t          ! ak T
+    real(r8), allocatable, dimension(:,:,:,:) :: ak_t_lon      ! ak T
+    real(r8), allocatable, dimension(:,:,:,:) :: ak_t_lat      ! ak T
+    real(r8), allocatable, dimension(:,:,:,:) :: p             ! Pressure on full levels
+    real(r8), allocatable, dimension(:,:,:,:) :: p_p           ! Perturbed pressure on full levels
+    real(r8), allocatable, dimension(:,:,:,:) :: p_lev         ! Pressure on half levels
+    real(r8), allocatable, dimension(:,:,:,:) :: ph            ! Hydrostatic pressure on full levels
+    real(r8), allocatable, dimension(:,:,:,:) :: ph_lev        ! Hydrostatic pressure on half levels
+    real(r8), allocatable, dimension(:,:,:  ) :: phs           ! Surface hydrostatic pressure
+    real(r8), allocatable, dimension(:,:,:,:) :: ak            ! Coefficient for calculate gz on full levels
+    real(r8), allocatable, dimension(:,:,:,:) :: div           ! Divergence (s-1)
+    real(r8), allocatable, dimension(:,:,:,:) :: div2          ! Laplacian of divergence (s-1)
+    real(r8), allocatable, dimension(:,:,:,:) :: vor           ! Vorticity (s-1)
     ! Smagorinsky damping variables
-    real(r8), allocatable, dimension(:,:,:) :: tension_h     ! tension strain
-    real(r8), allocatable, dimension(:,:,:) :: shear_h       ! shear strain on vertex
-    real(r8), allocatable, dimension(:,:,:) :: kmh           ! nonlinear diffusion coef
-    real(r8), allocatable, dimension(:,:,:) :: kmh_vtx       ! nonlinear diffusion coef on vertex
-    real(r8), allocatable, dimension(:,:,:) :: kmh_lon       ! nonlinear diffusion coef on zonal edge
-    real(r8), allocatable, dimension(:,:,:) :: kmh_lat       ! nonlinear diffusion coef on meridional edge
-    real(r8) tm
-    real(r8) te
-    real(r8) tpe
-    real(r8) tav
+    real(r8), allocatable, dimension(:,:,:,:) :: tension_h     ! tension strain
+    real(r8), allocatable, dimension(:,:,:,:) :: shear_h       ! shear strain on vertex
+    real(r8), allocatable, dimension(:,:,:,:) :: kmh           ! nonlinear diffusion coef
+    real(r8), allocatable, dimension(:,:,:,:) :: kmh_vtx       ! nonlinear diffusion coef on vertex
+    real(r8), allocatable, dimension(:,:,:,:) :: kmh_lon       ! nonlinear diffusion coef on zonal edge
+    real(r8), allocatable, dimension(:,:,:,:) :: kmh_lat       ! nonlinear diffusion coef on meridional edge
+    real(r8), allocatable, dimension(:) :: tm
+    real(r8), allocatable, dimension(:) :: te
+    real(r8), allocatable, dimension(:) :: tpe
+    real(r8), allocatable, dimension(:) :: tav
     type(async_type), allocatable :: async(:)
 
     real(r8), allocatable, dimension(:,:,:) :: test          !test halo
@@ -96,85 +96,86 @@ module state_mod
 
 contains
 
-  subroutine state_init(this, mesh)
+  subroutine state_init(this, mesh , member_num)
 
     class(state_type), intent(inout)         :: this
     type(mesh_type  ), intent(in   ), target :: mesh
+    integer , intent(in)  :: member_num
 
     call this%clear()
 
     this%mesh => mesh
 
-    call allocate_array(mesh, this%u            , half_lon=.true., full_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%u850         , half_lon=.true., full_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%u700         , half_lon=.true., full_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%v            , full_lon=.true., half_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%v850         , full_lon=.true., half_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%v700         , full_lon=.true., half_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%wp           , full_lon=.true., full_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%wedphdlev_lev    , full_lon=.true., full_lat=.true., half_lev=.true.)
-    call allocate_array(mesh, this%wedphdlev_lev_lon, half_lon=.true., full_lat=.true., half_lev=.true.)
-    call allocate_array(mesh, this%wedphdlev_lev_lat, full_lon=.true., half_lat=.true., half_lev=.true.)
-    call allocate_array(mesh, this%gz           , full_lon=.true., full_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%gz_lev       , full_lon=.true., full_lat=.true., half_lev=.true.)
-    call allocate_array(mesh, this%m            , full_lon=.true., full_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%m_vtx        , half_lon=.true., half_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%m_lon        , half_lon=.true., full_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%m_lat        , full_lon=.true., half_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%mf_lon_n     , half_lon=.true., full_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%mf_lon_t     , half_lon=.true., full_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%mf_lat_n     , full_lon=.true., half_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%mf_lat_t     , full_lon=.true., half_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%pv           , half_lon=.true., half_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%pv_lon       , half_lon=.true., full_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%pv_lat       , full_lon=.true., half_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%dpv_lon_t    , half_lon=.true., full_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%dpv_lon_n    , half_lon=.true., full_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%dpv_lat_t    , full_lon=.true., half_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%dpv_lat_n    , full_lon=.true., half_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%ke           , full_lon=.true., full_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%pt           , full_lon=.true., full_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%pt_lon       , half_lon=.true., full_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%pt_lat       , full_lon=.true., half_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%pt_lev       , full_lon=.true., full_lat=.true., half_lev=.true.)
-    call allocate_array(mesh, this%t            , full_lon=.true., full_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%t850         , full_lon=.true., full_lat=.true.                 )
-    call allocate_array(mesh, this%t700         , full_lon=.true., full_lat=.true.                 )
-    call allocate_array(mesh, this%p            , full_lon=.true., full_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%p_lev        , full_lon=.true., full_lat=.true., half_lev=.true.)
-    call allocate_array(mesh, this%ph           , full_lon=.true., full_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%ph_lev       , full_lon=.true., full_lat=.true., half_lev=.true.)
-    call allocate_array(mesh, this%phs          , full_lon=.true., full_lat=.true.                 )
-    call allocate_array(mesh, this%div          , full_lon=.true., full_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%vor          , half_lon=.true., half_lat=.true., full_lev=.true.)
-    call allocate_array(mesh, this%ak           , full_lon=.true., full_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%u            , member_num , half_lon=.true., full_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%u850         , member_num ,half_lon=.true., full_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%u700         , member_num ,half_lon=.true., full_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%v            , member_num ,full_lon=.true., half_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%v850         , member_num ,full_lon=.true., half_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%v700         , member_num ,full_lon=.true., half_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%wp           , member_num ,full_lon=.true., full_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%wedphdlev_lev    , member_num ,full_lon=.true., full_lat=.true., half_lev=.true.)
+    call allocate_array(mesh, this%wedphdlev_lev_lon, member_num ,half_lon=.true., full_lat=.true., half_lev=.true.)
+    call allocate_array(mesh, this%wedphdlev_lev_lat, member_num ,full_lon=.true., half_lat=.true., half_lev=.true.)
+    call allocate_array(mesh, this%gz           , member_num ,full_lon=.true., full_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%gz_lev       , member_num ,full_lon=.true., full_lat=.true., half_lev=.true.)
+    call allocate_array(mesh, this%m            , member_num ,full_lon=.true., full_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%m_vtx        , member_num ,half_lon=.true., half_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%m_lon        , member_num ,half_lon=.true., full_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%m_lat        , member_num ,full_lon=.true., half_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%mf_lon_n     , member_num ,half_lon=.true., full_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%mf_lon_t     , member_num ,half_lon=.true., full_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%mf_lat_n     , member_num ,full_lon=.true., half_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%mf_lat_t     , member_num ,full_lon=.true., half_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%pv           , member_num ,half_lon=.true., half_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%pv_lon       , member_num ,half_lon=.true., full_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%pv_lat       , member_num ,full_lon=.true., half_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%dpv_lon_t    , member_num ,half_lon=.true., full_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%dpv_lon_n    , member_num ,half_lon=.true., full_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%dpv_lat_t    , member_num ,full_lon=.true., half_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%dpv_lat_n    , member_num ,full_lon=.true., half_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%ke           , member_num ,full_lon=.true., full_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%pt           , member_num ,full_lon=.true., full_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%pt_lon       , member_num ,half_lon=.true., full_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%pt_lat       , member_num ,full_lon=.true., half_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%pt_lev       , member_num ,full_lon=.true., full_lat=.true., half_lev=.true.)
+    call allocate_array(mesh, this%t            , member_num ,full_lon=.true., full_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%t850         , member_num ,full_lon=.true., full_lat=.true.                 )
+    call allocate_array(mesh, this%t700         , member_num ,full_lon=.true., full_lat=.true.                 )
+    call allocate_array(mesh, this%p            , member_num ,full_lon=.true., full_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%p_lev        , member_num ,full_lon=.true., full_lat=.true., half_lev=.true.)
+    call allocate_array(mesh, this%ph           , member_num ,full_lon=.true., full_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%ph_lev       , member_num ,full_lon=.true., full_lat=.true., half_lev=.true.)
+    call allocate_array(mesh, this%phs          , member_num ,full_lon=.true., full_lat=.true.                 )
+    call allocate_array(mesh, this%div          , member_num ,full_lon=.true., full_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%vor          , member_num ,half_lon=.true., half_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%ak           , member_num ,full_lon=.true., full_lat=.true., full_lev=.true.)
 
-    call allocate_array(mesh, this%test           , full_lon=.true., full_lat=.true., full_lev=.true.)
+    call allocate_array(mesh, this%test           , member_num ,full_lon=.true., full_lat=.true., full_lev=.true.)
 
     if (baroclinic .and. .not. hydrostatic) then
-      call allocate_array(mesh, this%w            , full_lon=.true., full_lat=.true., half_lev=.true.)
+      call allocate_array(mesh, this%w            , member_num ,full_lon=.true., full_lat=.true., half_lev=.true.)
     end if
 
     if (pgf_scheme == 'sb81') then
-      call allocate_array(mesh, this%t_lnpop      , full_lon=.true., full_lat=.true., full_lev=.true.)
-      call allocate_array(mesh, this%t_lnpop_lon  , half_lon=.true., full_lat=.true., full_lev=.true.)
-      call allocate_array(mesh, this%t_lnpop_lat  , full_lon=.true., half_lat=.true., full_lev=.true.)
-      call allocate_array(mesh, this%ak_t         , full_lon=.true., full_lat=.true., full_lev=.true.)
-      call allocate_array(mesh, this%ak_t_lon     , half_lon=.true., full_lat=.true., full_lev=.true.)
-      call allocate_array(mesh, this%ak_t_lat     , full_lon=.true., half_lat=.true., full_lev=.true.)
+      call allocate_array(mesh, this%t_lnpop      , member_num ,full_lon=.true., full_lat=.true., full_lev=.true.)
+      call allocate_array(mesh, this%t_lnpop_lon  , member_num ,half_lon=.true., full_lat=.true., full_lev=.true.)
+      call allocate_array(mesh, this%t_lnpop_lat  , member_num ,full_lon=.true., half_lat=.true., full_lev=.true.)
+      call allocate_array(mesh, this%ak_t         , member_num ,full_lon=.true., full_lat=.true., full_lev=.true.)
+      call allocate_array(mesh, this%ak_t_lon     , member_num ,half_lon=.true., full_lat=.true., full_lev=.true.)
+      call allocate_array(mesh, this%ak_t_lat     , member_num ,full_lon=.true., half_lat=.true., full_lev=.true.)
     end if
 
     if (div_damp_order == 4) then
-      call allocate_array(mesh, this%div2         , full_lon=.true., full_lat=.true., full_lev=.true.)
+      call allocate_array(mesh, this%div2         , member_num ,full_lon=.true., full_lat=.true., full_lev=.true.)
     end if
 
     if (use_smag_damp) then
-      call allocate_array(mesh, this%tension_h    , full_lon=.true., full_lat=.true., full_lev=.true.)
-      call allocate_array(mesh, this%shear_h      , half_lon=.true., half_lat=.true., full_lev=.true.)
-      call allocate_array(mesh, this%kmh          , full_lon=.true., full_lat=.true., full_lev=.true.)
-      call allocate_array(mesh, this%kmh_vtx      , half_lon=.true., half_lat=.true., full_lev=.true.)
-      call allocate_array(mesh, this%kmh_lon      , half_lon=.true., full_lat=.true., full_lev=.true.)
-      call allocate_array(mesh, this%kmh_lat      , full_lon=.true., half_lat=.true., full_lev=.true.)
+      call allocate_array(mesh, this%tension_h    , member_num ,full_lon=.true., full_lat=.true., full_lev=.true.)
+      call allocate_array(mesh, this%shear_h      , member_num ,half_lon=.true., half_lat=.true., full_lev=.true.)
+      call allocate_array(mesh, this%kmh          , member_num ,full_lon=.true., full_lat=.true., full_lev=.true.)
+      call allocate_array(mesh, this%kmh_vtx      , member_num ,half_lon=.true., half_lat=.true., full_lev=.true.)
+      call allocate_array(mesh, this%kmh_lon      , member_num ,half_lon=.true., full_lat=.true., full_lev=.true.)
+      call allocate_array(mesh, this%kmh_lat      , member_num ,full_lon=.true., half_lat=.true., full_lev=.true.)
     end if
 
     allocate(this%async(11))

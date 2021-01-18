@@ -62,7 +62,7 @@ contains
     call process_create_blocks()
     call pa_init(proc%comm);
     call time_init()
-    call history_init()
+    call history_init(member_num)
     call restart_init()
     call reduce_init(proc%blocks)
     proc%NeedReduce = proc%blocks(1)%NeedReduce
@@ -101,8 +101,6 @@ contains
   end subroutine gmcore_init
 
   subroutine gmcore_run()
-
-    !try
 
     call operators_prepare(proc%blocks, old, dt_in_seconds)
     call diagnose(proc%blocks, old)

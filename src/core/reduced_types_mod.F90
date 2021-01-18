@@ -79,49 +79,49 @@ module reduced_types_mod
   end type reduced_static_type
 
   type reduced_state_type
-    real(r8), allocatable, dimension(:,:,:,:) :: u
-    real(r8), allocatable, dimension(:,:,:,:) :: v
-    real(r8), allocatable, dimension(:,:,:,:) :: gz
-    real(r8), allocatable, dimension(:,:,:,:) :: m
-    real(r8), allocatable, dimension(:,:,:,:) :: m_lon
-    real(r8), allocatable, dimension(:,:,:,:) :: m_lat
-    real(r8), allocatable, dimension(:,:,:,:) :: mf_lon_n
-    real(r8), allocatable, dimension(:,:,:,:) :: mf_lon_t
-    real(r8), allocatable, dimension(:,:,:,:) :: mf_lat_n
-    real(r8), allocatable, dimension(:,:,:,:) :: mf_lat_t
-    real(r8), allocatable, dimension(:,:,:,:) :: pv
-    real(r8), allocatable, dimension(:,:,:,:) :: pv_lon
-    real(r8), allocatable, dimension(:,:,:,:) :: pv_lat
-    real(r8), allocatable, dimension(:,:,:,:) :: dpv_lon_t
-    real(r8), allocatable, dimension(:,:,:,:) :: dpv_lat_t
-    real(r8), allocatable, dimension(:,:,:,:) :: dpv_lon_n
-    real(r8), allocatable, dimension(:,:,:,:) :: dpv_lat_n
-    real(r8), allocatable, dimension(:,:,:,:) :: ke
+    real(r8), allocatable, dimension(:,:,:,:,:) :: u
+    real(r8), allocatable, dimension(:,:,:,:,:) :: v
+    real(r8), allocatable, dimension(:,:,:,:,:) :: gz
+    real(r8), allocatable, dimension(:,:,:,:,:) :: m
+    real(r8), allocatable, dimension(:,:,:,:,:) :: m_lon
+    real(r8), allocatable, dimension(:,:,:,:,:) :: m_lat
+    real(r8), allocatable, dimension(:,:,:,:,:) :: mf_lon_n
+    real(r8), allocatable, dimension(:,:,:,:,:) :: mf_lon_t
+    real(r8), allocatable, dimension(:,:,:,:,:) :: mf_lat_n
+    real(r8), allocatable, dimension(:,:,:,:,:) :: mf_lat_t
+    real(r8), allocatable, dimension(:,:,:,:,:) :: pv
+    real(r8), allocatable, dimension(:,:,:,:,:) :: pv_lon
+    real(r8), allocatable, dimension(:,:,:,:,:) :: pv_lat
+    real(r8), allocatable, dimension(:,:,:,:,:) :: dpv_lon_t
+    real(r8), allocatable, dimension(:,:,:,:,:) :: dpv_lat_t
+    real(r8), allocatable, dimension(:,:,:,:,:) :: dpv_lon_n
+    real(r8), allocatable, dimension(:,:,:,:,:) :: dpv_lat_n
+    real(r8), allocatable, dimension(:,:,:,:,:) :: ke
     ! Baroclinic:
-    real(r8), allocatable, dimension(:,:,:,:) :: gz_lev
-    real(r8), allocatable, dimension(:,:,:,:) :: pt
-    real(r8), allocatable, dimension(:,:,:,:) :: pt_lon
-    real(r8), allocatable, dimension(:,:,:,:) :: ptf_lon
-    real(r8), allocatable, dimension(:,:,:,:) :: ph_lev
-    real(r8), allocatable, dimension(:,:,:,:) :: ph
-    real(r8), allocatable, dimension(:,:,:,:) :: ak
-    real(r8), allocatable, dimension(:,:,:,:) :: t
-    real(r8), allocatable, dimension(:,:,:,:) :: t_lnpop_lon
-    real(r8), allocatable, dimension(:,:,:,:) :: ak_t_lon
+    real(r8), allocatable, dimension(:,:,:,:,:) :: gz_lev
+    real(r8), allocatable, dimension(:,:,:,:,:) :: pt
+    real(r8), allocatable, dimension(:,:,:,:,:) :: pt_lon
+    real(r8), allocatable, dimension(:,:,:,:,:) :: ptf_lon
+    real(r8), allocatable, dimension(:,:,:,:,:) :: ph_lev
+    real(r8), allocatable, dimension(:,:,:,:,:) :: ph
+    real(r8), allocatable, dimension(:,:,:,:,:) :: ak
+    real(r8), allocatable, dimension(:,:,:,:,:) :: t
+    real(r8), allocatable, dimension(:,:,:,:,:) :: t_lnpop_lon
+    real(r8), allocatable, dimension(:,:,:,:,:) :: ak_t_lon
     type(async_type), allocatable :: async(:,:,:)
   contains
     final :: reduced_state_final
   end type reduced_state_type
 
   type reduced_tend_type
-    real(r8), allocatable, dimension(:,:) :: qhv
-    real(r8), allocatable, dimension(:,:) :: qhu
-    real(r8), allocatable, dimension(:,:) :: fv
-    real(r8), allocatable, dimension(:,:) :: fu
-    real(r8), allocatable, dimension(:,:) :: dmfdlon
-    real(r8), allocatable, dimension(:,:) :: pgf_lon
-    real(r8), allocatable, dimension(:,:) :: dkedlon
-    real(r8), allocatable, dimension(:,:) :: dptfdlon
+    real(r8), allocatable, dimension(:,:,:) :: qhv
+    real(r8), allocatable, dimension(:,:,:) :: qhu
+    real(r8), allocatable, dimension(:,:,:) :: fv
+    real(r8), allocatable, dimension(:,:,:) :: fu
+    real(r8), allocatable, dimension(:,:,:) :: dmfdlon
+    real(r8), allocatable, dimension(:,:,:) :: pgf_lon
+    real(r8), allocatable, dimension(:,:,:) :: dkedlon
+    real(r8), allocatable, dimension(:,:,:) :: dptfdlon
   contains
     final :: reduced_tend_final
   end type reduced_tend_type

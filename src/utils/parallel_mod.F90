@@ -30,12 +30,16 @@ module parallel_mod
   public async_dpv_lon_t
   public async_dpv_lat_t
   public fill_zonal_halo
+  public fill_zonal_halo_member
   public fill_halo
+  public fill_halo_member
   public zero_halo
+  public zero_halo_member
   public zonal_sum
   public zonal_sum_ensure_order
   public global_sum
   public overlay_inner_halo
+  public overlay_inner_halo_member
   public barrier
 
   interface fill_zonal_halo
@@ -45,6 +49,13 @@ module parallel_mod
     module procedure fill_zonal_halo_2d_r8_async
   end interface fill_zonal_halo
 
+  interface fill_zonal_halo_member
+  module procedure fill_zonal_halo_1d_r8_member
+  module procedure fill_zonal_halo_1d_r8_async_member
+  module procedure fill_zonal_halo_2d_r8_member
+  module procedure fill_zonal_halo_2d_r8_async_member
+end interface fill_zonal_halo_member
+
   interface fill_halo
     module procedure fill_halo_2d_r8
     module procedure fill_halo_2d_r8_async
@@ -52,21 +63,35 @@ module parallel_mod
     module procedure fill_halo_3d_r8_async
   end interface fill_halo
 
+  interface fill_halo_member
+  module procedure fill_halo_2d_r8_member
+  module procedure fill_halo_2d_r8_async_member
+  module procedure fill_halo_3d_r8_member
+  module procedure fill_halo_3d_r8_async_member
+end interface fill_halo_member
+
   interface zero_halo
     module procedure zero_halo_1d_r8
   end interface zero_halo
 
+  interface zero_halo_member
+  module procedure zero_halo_1d_r8_member
+end interface zero_halo_member
+
   interface zonal_sum
     module procedure zonal_sum_0d_r8
     module procedure zonal_sum_1d_r8
+    module procedure zonal_sum_2d_r8
   end interface zonal_sum
 
   interface zonal_sum_ensure_order
     module procedure zonal_sum_ensure_order_1d_r8
+    module procedure zonal_sum_ensure_order_2d_r8
   end interface zonal_sum_ensure_order
 
   interface global_sum
     module procedure global_sum_0d_r8
+    module procedure global_sum_1d_r8
   end interface global_sum
 
 contains
@@ -273,6 +298,218 @@ contains
 
   end subroutine fill_zonal_halo_2d_r8_async
 
+  subroutine fill_zonal_halo_1d_r8_member(block, halo_width, array, west_halo, east_halo)
+
+    type(block_type), intent(in) :: block
+    integer, intent(in) :: halo_width
+    real(8), intent(inout)  :: array(:,:)
+    logical, intent(in), optional :: west_halo
+    logical, intent(in), optional :: east_halo
+
+    integer status(MPI_STATUS_SIZE), ierr
+    integer i1, i2, i3, i4
+    integer nm
+
+    if (merge(west_halo, .true., present(west_halo))) then
+      !   west halo |                                   | east_halo
+      !  ___________|___________________________________|___________
+      ! |     |     |     |     |     |     |     |     |     |     |
+      ! | i3  | i4  |     |     |     |     | i1  | i2  |     |  n  |
+      ! |_____|_____|_____|_____|_____|_____|_____|_____|_____|_____|
+      !    |                                   |
+      !    1                              n - 2 w + 1
+      
+      nm = size(array,1)
+
+      i1 = size(array,2) - 2 * halo_width + 1
+      i2 = i1 + halo_width - 1
+      i3 = 1
+      i4 = i3 + halo_width - 1
+      call MPI_SENDRECV(array(:,i1:i2), halo_width * nm, block%halo(east)%dtype, block%halo(east)%proc_id, 1, &
+                        array(:,i3:i4), halo_width * nm, block%halo(west)%dtype, block%halo(west)%proc_id, 1, &
+                        proc%comm, status, ierr)
+    end if
+    if (merge(east_halo, .true., present(east_halo))) then
+      !   west halo |                                   | east_halo
+      !  ___________|___________________________________|___________
+      ! |     |     |     |     |     |     |     |     |     |     |
+      ! |     |     | i1  | i2  |     |     |     |     | i3  | i4  |
+      ! |_____|_____|_____|_____|_____|_____|_____|_____|_____|_____|
+      !                |                                   |
+      !              1 + w                             n - w + 1
+      i1 = 1 + halo_width
+      i2 = i1 + halo_width - 1
+      i3 = size(array,2) - halo_width + 1
+      i4 = i3 + halo_width - 1
+      call MPI_SENDRECV(array(:,i1:i2), halo_width * nm, block%halo(west)%dtype, block%halo(west)%proc_id, 2, &
+                        array(:,i3:i4), halo_width * nm, block%halo(east)%dtype, block%halo(east)%proc_id, 2, &
+                        proc%comm, status, ierr)
+    end if
+
+  end subroutine fill_zonal_halo_1d_r8_member
+
+  subroutine fill_zonal_halo_1d_r8_async_member(block, halo_width, array, async, west_halo, east_halo)
+
+    type(block_type), intent(in) :: block
+    integer, intent(in) :: halo_width
+    real(8), intent(inout)  :: array(:,:)
+    type(async_type), intent(inout) :: async
+    logical, intent(in), optional :: west_halo
+    logical, intent(in), optional :: east_halo
+
+    integer ierr
+    integer i1, i2, i3, i4
+    integer nm
+
+    call fill_zonal_halo_1d_r8_member(block, halo_width, array, west_halo, east_halo)
+    return
+
+    if (merge(west_halo, .true., present(west_halo))) then
+      if (async%send_req(west) /= MPI_REQUEST_NULL) call MPI_WAIT(async%send_req(west), MPI_STATUS_IGNORE, ierr)
+      if (async%recv_req(west) /= MPI_REQUEST_NULL) call MPI_WAIT(async%recv_req(west), MPI_STATUS_IGNORE, ierr)
+      !   west halo |                                   | east_halo
+      !  ___________|___________________________________|___________
+      ! |     |     |     |     |     |     |     |     |     |     |
+      ! | i3  | i4  |     |     |     |     | i1  | i2  |     |  n  |
+      ! |_____|_____|_____|_____|_____|_____|_____|_____|_____|_____|
+      !    |                                   |
+      !    1                              n - 2 w + 1
+
+      nm = size(array , 1)
+
+      i1 = size(array, 2) - 2 * halo_width + 1
+      i2 = i1 + halo_width - 1
+      i3 = 1
+      i4 = i3 + halo_width - 1
+      call MPI_ISEND(array(:,i1:i2), halo_width * nm, block%halo(east)%dtype, block%halo(east)%proc_id, 1, proc%comm, async%send_req(west), ierr)
+      call MPI_IRECV(array(:,i3:i4), halo_width * nm, block%halo(west)%dtype, block%halo(west)%proc_id, 1, proc%comm, async%recv_req(west), ierr)
+    end if
+    if (merge(east_halo, .true., present(east_halo))) then
+      if (async%send_req(east) /= MPI_REQUEST_NULL) call MPI_WAIT(async%send_req(east), MPI_STATUS_IGNORE, ierr)
+      if (async%recv_req(east) /= MPI_REQUEST_NULL) call MPI_WAIT(async%recv_req(east), MPI_STATUS_IGNORE, ierr)
+      !   west halo |                                   | east_halo
+      !  ___________|___________________________________|___________
+      ! |     |     |     |     |     |     |     |     |     |     |
+      ! |     |     | i1  | i2  |     |     |     |     | i3  | i4  |
+      ! |_____|_____|_____|_____|_____|_____|_____|_____|_____|_____|
+      !                |                                   |
+      !              1 + w                             n - w + 1
+      i1 = 1 + halo_width
+      i2 = i1 + halo_width - 1
+      i3 = size(array,2) - halo_width + 1
+      i4 = i3 + halo_width - 1
+      call MPI_ISEND(array(:,i1:i2), halo_width * nm, block%halo(west)%dtype, block%halo(west)%proc_id, 2, proc%comm, async%send_req(east), ierr)
+      call MPI_IRECV(array(:,i3:i4), halo_width * nm, block%halo(east)%dtype, block%halo(east)%proc_id, 2, proc%comm, async%recv_req(east), ierr)
+    end if
+
+  end subroutine fill_zonal_halo_1d_r8_async_member
+
+  subroutine fill_zonal_halo_2d_r8_member(block, halo_width, array, west_halo, east_halo)
+
+    type(block_type), intent(in) :: block
+    integer, intent(in) :: halo_width
+    real(8), intent(inout)  :: array(:,:,:)
+    logical, intent(in), optional :: west_halo
+    logical, intent(in), optional :: east_halo
+
+    integer status(MPI_STATUS_SIZE), ierr
+    integer nx, nz, nm, i1, i2, i3, i4
+    
+    nm = size(array, 1)
+    nz = size(array, 2)
+    nx = size(array, 3)
+
+    if (merge(west_halo, .true., present(west_halo))) then
+      !   west halo |                                   | east_halo
+      !  ___________|___________________________________|___________
+      ! |     |     |     |     |     |     |     |     |     |     |
+      ! | i3  | i4  |     |     |     |     | i1  | i2  |     |  n  |
+      ! |_____|_____|_____|_____|_____|_____|_____|_____|_____|_____|
+      !    |                                   |
+      !    1                             nx - 2 w + 1
+      i1 = nx - 2 * halo_width + 1
+      i2 = i1 + halo_width - 1
+      i3 = 1
+      i4 = i3 + halo_width - 1
+      call MPI_SENDRECV(array(:,:,i1:i2), halo_width * nz * nm, block%halo(east)%dtype, block%halo(east)%proc_id, 1, &
+                        array(:,:,i3:i4), halo_width * nz * nm, block%halo(west)%dtype, block%halo(west)%proc_id, 1, &
+                        proc%comm, status, ierr)
+    end if
+    if (merge(east_halo, .true., present(east_halo))) then
+      !   west halo |                                   | east_halo
+      !  ___________|___________________________________|___________
+      ! |     |     |     |     |     |     |     |     |     |     |
+      ! |     |     | i1  | i2  |     |     |     |     | i3  | i4  |
+      ! |_____|_____|_____|_____|_____|_____|_____|_____|_____|_____|
+      !                |                                   |
+      !              1 + w                            nx - w + 1
+      i1 = 1 + halo_width
+      i2 = i1 + halo_width - 1
+      i3 = nx - halo_width + 1
+      i4 = i3 + halo_width - 1
+      call MPI_SENDRECV(array(:,:,i1:i2), halo_width * nz * nm, block%halo(west)%dtype, block%halo(west)%proc_id, 2, &
+                        array(:,:,i3:i4), halo_width * nz * nm, block%halo(east)%dtype, block%halo(east)%proc_id, 2, &
+                        proc%comm, status, ierr)
+    end if
+
+  end subroutine fill_zonal_halo_2d_r8_member
+
+  subroutine fill_zonal_halo_2d_r8_async_member(block, halo_width, array, async, west_halo, east_halo)
+
+    type(block_type), intent(in) :: block
+    integer, intent(in) :: halo_width
+    real(8), intent(inout)  :: array(:,:,:)
+    type(async_type), intent(inout) :: async
+    logical, intent(in), optional :: west_halo
+    logical, intent(in), optional :: east_halo
+
+    integer ierr
+    integer nx, nz, nm ,i1, i2, i3, i4
+
+    call fill_zonal_halo_2d_r8_member(block, halo_width, array, west_halo, east_halo)
+    return
+
+    nm = size(array, 1)
+    nz = size(array, 2)
+    nx = size(array, 3)
+
+    if (merge(west_halo, .true., present(west_halo))) then
+      if (async%send_req(west) /= MPI_REQUEST_NULL) call MPI_WAIT(async%send_req(west), MPI_STATUS_IGNORE, ierr)
+      if (async%recv_req(west) /= MPI_REQUEST_NULL) call MPI_WAIT(async%recv_req(west), MPI_STATUS_IGNORE, ierr)
+      !   west halo |                                   | east_halo
+      !  ___________|___________________________________|___________
+      ! |     |     |     |     |     |     |     |     |     |     |
+      ! | i3  | i4  |     |     |     |     | i1  | i2  |     |  n  |
+      ! |_____|_____|_____|_____|_____|_____|_____|_____|_____|_____|
+      !    |                                   |
+      !    1                             nx - 2 w + 1
+      i1 = nx - 2 * halo_width + 1
+      i2 = i1 + halo_width - 1
+      i3 = 1
+      i4 = i3 + halo_width - 1
+      call MPI_ISEND(array(:,:,i1:i2), halo_width * nz * nm, block%halo(east)%dtype, block%halo(east)%proc_id, 1, proc%comm, async%send_req(west), ierr)
+      call MPI_IRECV(array(:,:,i3:i4), halo_width * nz * nm, block%halo(west)%dtype, block%halo(west)%proc_id, 1, proc%comm, async%recv_req(west), ierr)
+    end if
+    if (merge(east_halo, .true., present(east_halo))) then
+      if (async%send_req(east) /= MPI_REQUEST_NULL) call MPI_WAIT(async%send_req(east), MPI_STATUS_IGNORE, ierr)
+      if (async%recv_req(east) /= MPI_REQUEST_NULL) call MPI_WAIT(async%recv_req(east), MPI_STATUS_IGNORE, ierr)
+      !   west halo |                                   | east_halo
+      !  ___________|___________________________________|___________
+      ! |     |     |     |     |     |     |     |     |     |     |
+      ! |     |     | i1  | i2  |     |     |     |     | i3  | i4  |
+      ! |_____|_____|_____|_____|_____|_____|_____|_____|_____|_____|
+      !                |                                   |
+      !              1 + w                            nx - w + 1
+      i1 = 1 + halo_width
+      i2 = i1 + halo_width - 1
+      i3 = nx - halo_width + 1
+      i4 = i3 + halo_width - 1
+      call MPI_ISEND(array(:,:,i1:i2), halo_width * nz * nm, block%halo(west)%dtype, block%halo(west)%proc_id, 2, proc%comm, async%send_req(east), ierr)
+      call MPI_IRECV(array(:,:,i3:i4), halo_width * nz * nm, block%halo(east)%dtype, block%halo(east)%proc_id, 2, proc%comm, async%recv_req(east), ierr)
+    end if
+
+  end subroutine fill_zonal_halo_2d_r8_async_member
+
   subroutine fill_halo_2d_r8(block, array, full_lon, full_lat, west_halo, east_halo, south_halo, north_halo)
 
     type(block_type), intent(in) :: block
@@ -461,6 +698,194 @@ contains
 
   end subroutine fill_halo_3d_r8_async
 
+  subroutine fill_halo_2d_r8_member(block, array, full_lon, full_lat, west_halo, east_halo, south_halo, north_halo)
+
+    type(block_type), intent(in) :: block
+    real(8), intent(inout) :: array(:,:,:)
+    logical, intent(in) :: full_lon
+    logical, intent(in) :: full_lat
+    logical, intent(in), optional :: west_halo
+    logical, intent(in), optional :: east_halo
+    logical, intent(in), optional :: south_halo
+    logical, intent(in), optional :: north_halo
+
+    integer status(MPI_STATUS_SIZE), i, j, ierr
+
+    i = merge(1, 2, full_lon)
+    j = merge(1, 2, full_lat)
+
+    if (merge(west_halo, .true., present(west_halo))) then
+      call MPI_SENDRECV(array, 1, block%halo(east)%send_type_2d(i,j), block%halo(east)%proc_id, 3, &
+                        array, 1, block%halo(west)%recv_type_2d(i,j), block%halo(west)%proc_id, 3, &
+                        proc%comm, status, ierr)
+    end if
+
+    if (merge(east_halo, .true., present(east_halo))) then
+      call MPI_SENDRECV(array, 1, block%halo(west)%send_type_2d(i,j), block%halo(west)%proc_id, 7, &
+                        array, 1, block%halo(east)%recv_type_2d(i,j), block%halo(east)%proc_id, 7, &
+                        proc%comm, status, ierr)
+    end if
+
+    if (merge(south_halo, .true., present(south_halo))) then
+      call MPI_SENDRECV(array, 1, block%halo(north)%send_type_2d(i,j), block%halo(north)%proc_id, 11, &
+                        array, 1, block%halo(south)%recv_type_2d(i,j), block%halo(south)%proc_id, 11, &
+                        proc%comm, status, ierr)
+    end if
+
+    if (merge(north_halo, .true., present(north_halo))) then
+      call MPI_SENDRECV(array, 1, block%halo(south)%send_type_2d(i,j), block%halo(south)%proc_id, 15, &
+                        array, 1, block%halo(north)%recv_type_2d(i,j), block%halo(north)%proc_id, 15, &
+                        proc%comm, status, ierr)
+    end if
+
+  end subroutine fill_halo_2d_r8_member
+
+  subroutine fill_halo_2d_r8_async_member(block, array, full_lon, full_lat, async, west_halo, east_halo, south_halo, north_halo)
+
+    type(block_type), intent(in) :: block
+    real(8), intent(inout) :: array(:,:,:)
+    logical, intent(in) :: full_lon
+    logical, intent(in) :: full_lat
+    type(async_type), intent(inout) :: async
+    logical, intent(in), optional :: west_halo
+    logical, intent(in), optional :: east_halo
+    logical, intent(in), optional :: south_halo
+    logical, intent(in), optional :: north_halo
+
+    integer i, j, ierr
+
+    call fill_halo_2d_r8_member(block, array, full_lon, full_lat, west_halo, east_halo, south_halo, north_halo)
+    return
+
+    i = merge(1, 2, full_lon)
+    j = merge(1, 2, full_lat)
+
+    if (merge(west_halo, .true., present(west_halo))) then
+      if (async%send_req(west) /= MPI_REQUEST_NULL) call MPI_WAIT(async%send_req(west), MPI_STATUS_IGNORE, ierr)
+      if (async%recv_req(west) /= MPI_REQUEST_NULL) call MPI_WAIT(async%recv_req(west), MPI_STATUS_IGNORE, ierr)
+      call MPI_ISEND(array, 1, block%halo(east)%send_type_2d(i,j), block%halo(east)%proc_id, 3, proc%comm, async%send_req(west), ierr)
+      call MPI_IRECV(array, 1, block%halo(west)%recv_type_2d(i,j), block%halo(west)%proc_id, 3, proc%comm, async%recv_req(west), ierr)
+    end if
+
+    if (merge(east_halo, .true., present(east_halo))) then
+      if (async%send_req(east) /= MPI_REQUEST_NULL) call MPI_WAIT(async%send_req(east), MPI_STATUS_IGNORE, ierr)
+      if (async%recv_req(east) /= MPI_REQUEST_NULL) call MPI_WAIT(async%recv_req(east), MPI_STATUS_IGNORE, ierr)
+      call MPI_ISEND(array, 1, block%halo(west)%send_type_2d(i,j), block%halo(west)%proc_id, 7, proc%comm, async%send_req(east), ierr)
+      call MPI_IRECV(array, 1, block%halo(east)%recv_type_2d(i,j), block%halo(east)%proc_id, 7, proc%comm, async%recv_req(east), ierr)
+    end if
+
+    if (merge(south_halo, .true., present(south_halo))) then
+      if (async%send_req(south) /= MPI_REQUEST_NULL) call MPI_WAIT(async%send_req(south), MPI_STATUS_IGNORE, ierr)
+      if (async%recv_req(south) /= MPI_REQUEST_NULL) call MPI_WAIT(async%recv_req(south), MPI_STATUS_IGNORE, ierr)
+      call MPI_ISEND(array, 1, block%halo(north)%send_type_2d(i,j), block%halo(north)%proc_id, 11, proc%comm, async%send_req(south), ierr)
+      call MPI_IRECV(array, 1, block%halo(south)%recv_type_2d(i,j), block%halo(south)%proc_id, 11, proc%comm, async%recv_req(south), ierr)
+    end if
+
+    if (merge(north_halo, .true., present(north_halo))) then
+      if (async%send_req(north) /= MPI_REQUEST_NULL) call MPI_WAIT(async%send_req(north), MPI_STATUS_IGNORE, ierr)
+      if (async%recv_req(north) /= MPI_REQUEST_NULL) call MPI_WAIT(async%recv_req(north), MPI_STATUS_IGNORE, ierr)
+      call MPI_ISEND(array, 1, block%halo(south)%send_type_2d(i,j), block%halo(south)%proc_id, 15, proc%comm, async%send_req(north), ierr)
+      call MPI_IRECV(array, 1, block%halo(north)%recv_type_2d(i,j), block%halo(north)%proc_id, 15, proc%comm, async%recv_req(north), ierr)
+    end if
+
+  end subroutine fill_halo_2d_r8_async_member
+
+  subroutine fill_halo_3d_r8_member(block, array, full_lon, full_lat, full_lev, west_halo, east_halo, south_halo, north_halo)
+
+    type(block_type), intent(in) :: block
+    real(8), intent(inout) :: array(:,:,:,:)
+    logical, intent(in) :: full_lon
+    logical, intent(in) :: full_lat
+    logical, intent(in), optional :: full_lev
+    logical, intent(in), optional :: west_halo
+    logical, intent(in), optional :: east_halo
+    logical, intent(in), optional :: south_halo
+    logical, intent(in), optional :: north_halo
+
+    integer status(MPI_STATUS_SIZE), i, j, k, ierr
+
+    i = merge(1, 2, full_lon)
+    j = merge(1, 2, full_lat)
+    k = merge(1, 2, merge(full_lev, .true., present(full_lev)))
+
+    if (merge(west_halo, .true., present(west_halo))) then
+      call MPI_SENDRECV(array, 1, block%halo(east)%send_type_3d(i,j,k), block%halo(east)%proc_id, 3, &
+                        array, 1, block%halo(west)%recv_type_3d(i,j,k), block%halo(west)%proc_id, 3, &
+                        proc%comm, status, ierr)
+    end if
+
+    if (merge(east_halo, .true., present(east_halo))) then
+      call MPI_SENDRECV(array, 1, block%halo(west)%send_type_3d(i,j,k), block%halo(west)%proc_id, 7, &
+                        array, 1, block%halo(east)%recv_type_3d(i,j,k), block%halo(east)%proc_id, 7, &
+                        proc%comm, status, ierr)
+    end if
+
+    if (merge(south_halo, .true., present(south_halo))) then
+      call MPI_SENDRECV(array, 1, block%halo(north)%send_type_3d(i,j,k), block%halo(north)%proc_id, 11, &
+                        array, 1, block%halo(south)%recv_type_3d(i,j,k), block%halo(south)%proc_id, 11, &
+                        proc%comm, status, ierr)
+    end if
+
+    if (merge(north_halo, .true., present(north_halo))) then
+      call MPI_SENDRECV(array, 1, block%halo(south)%send_type_3d(i,j,k), block%halo(south)%proc_id, 15, &
+                        array, 1, block%halo(north)%recv_type_3d(i,j,k), block%halo(north)%proc_id, 15, &
+                        proc%comm, status, ierr)
+    end if
+
+  end subroutine fill_halo_3d_r8_member
+
+  subroutine fill_halo_3d_r8_async_member(block, array, full_lon, full_lat, async, full_lev, west_halo, east_halo, south_halo, north_halo)
+
+    type(block_type), intent(in) :: block
+    real(8), intent(inout) :: array(:,:,:,:)
+    logical, intent(in) :: full_lon
+    logical, intent(in) :: full_lat
+    type(async_type), intent(inout) :: async
+    logical, intent(in), optional :: full_lev
+    logical, intent(in), optional :: west_halo
+    logical, intent(in), optional :: east_halo
+    logical, intent(in), optional :: south_halo
+    logical, intent(in), optional :: north_halo
+
+    integer i, j, k, ierr
+
+    call fill_halo_3d_r8_member(block, array, full_lon, full_lat, full_lev, west_halo, east_halo, south_halo, north_halo)
+    return
+
+    i = merge(1, 2, full_lon)
+    j = merge(1, 2, full_lat)
+    k = merge(1, 2, merge(full_lev, .true., present(full_lev)))
+
+    if (merge(west_halo, .true., present(west_halo))) then
+      if (async%send_req(west) /= MPI_REQUEST_NULL) call MPI_WAIT(async%send_req(west), MPI_STATUS_IGNORE, ierr)
+      if (async%recv_req(west) /= MPI_REQUEST_NULL) call MPI_WAIT(async%recv_req(west), MPI_STATUS_IGNORE, ierr)
+      call MPI_ISEND(array, 1, block%halo(east)%send_type_3d(i,j,k), block%halo(east)%proc_id, 3, proc%comm, async%send_req(west), ierr)
+      call MPI_IRECV(array, 1, block%halo(west)%recv_type_3d(i,j,k), block%halo(west)%proc_id, 3, proc%comm, async%recv_req(west), ierr)
+    end if
+
+    if (merge(east_halo, .true., present(east_halo))) then
+      if (async%send_req(east) /= MPI_REQUEST_NULL) call MPI_WAIT(async%send_req(east), MPI_STATUS_IGNORE, ierr)
+      if (async%recv_req(east) /= MPI_REQUEST_NULL) call MPI_WAIT(async%recv_req(east), MPI_STATUS_IGNORE, ierr)
+      call MPI_ISEND(array, 1, block%halo(west)%send_type_3d(i,j,k), block%halo(west)%proc_id, 7, proc%comm, async%send_req(east), ierr)
+      call MPI_IRECV(array, 1, block%halo(east)%recv_type_3d(i,j,k), block%halo(east)%proc_id, 7, proc%comm, async%recv_req(east), ierr)
+    end if
+
+    if (merge(south_halo, .true., present(south_halo))) then
+      if (async%send_req(south) /= MPI_REQUEST_NULL) call MPI_WAIT(async%send_req(south), MPI_STATUS_IGNORE, ierr)
+      if (async%recv_req(south) /= MPI_REQUEST_NULL) call MPI_WAIT(async%recv_req(south), MPI_STATUS_IGNORE, ierr)
+      call MPI_ISEND(array, 1, block%halo(north)%send_type_3d(i,j,k), block%halo(north)%proc_id, 11, proc%comm, async%send_req(south), ierr)
+      call MPI_IRECV(array, 1, block%halo(south)%recv_type_3d(i,j,k), block%halo(south)%proc_id, 11, proc%comm, async%recv_req(south), ierr)
+    end if
+
+    if (merge(north_halo, .true., present(north_halo))) then
+      if (async%send_req(north) /= MPI_REQUEST_NULL) call MPI_WAIT(async%send_req(north), MPI_STATUS_IGNORE, ierr)
+      if (async%recv_req(north) /= MPI_REQUEST_NULL) call MPI_WAIT(async%recv_req(north), MPI_STATUS_IGNORE, ierr)
+      call MPI_ISEND(array, 1, block%halo(south)%send_type_3d(i,j,k), block%halo(south)%proc_id, 15, proc%comm, async%send_req(north), ierr)
+      call MPI_IRECV(array, 1, block%halo(north)%recv_type_3d(i,j,k), block%halo(north)%proc_id, 15, proc%comm, async%recv_req(north), ierr)
+    end if
+
+  end subroutine fill_halo_3d_r8_async_member
+
   subroutine zero_halo_1d_r8(block, array, west_halo, east_halo)
 
     type(block_type), intent(in) :: block
@@ -498,6 +923,43 @@ contains
 
   end subroutine zero_halo_1d_r8
 
+  subroutine zero_halo_1d_r8_member(block, array, west_halo, east_halo)
+
+    type(block_type), intent(in) :: block
+    real(8), intent(inout) :: array(:,:)
+    logical, intent(in), optional :: west_halo
+    logical, intent(in), optional :: east_halo
+
+    integer i1, i2
+
+    if (merge(west_halo, .false., present(west_halo))) then
+      !   west halo |                                   | east_halo
+      !  ___________|___________________________________|___________
+      ! |     |     |     |     |     |     |     |     |     |     |
+      ! | i1  | i2  |     |     |     |     |     |     |     |     |
+      ! |_____|_____|_____|_____|_____|_____|_____|_____|_____|_____|
+      !    |     |
+      !    1  1 + w - 1
+      i1 = 1
+      i2 = 1 + block%mesh%lon_halo_width - 1
+      array(:,i1:i2) = 0.0d0
+    end if
+
+    if (merge(east_halo, .false., present(east_halo))) then
+      !   west halo |                                   | east_halo
+      !  ___________|___________________________________|___________
+      ! |     |     |     |     |     |     |     |     |     |     |
+      ! |     |     |     |     |     |     |     |     | i1  | i2  |
+      ! |_____|_____|_____|_____|_____|_____|_____|_____|_____|_____|
+      !                                                    |     |
+      !                                                n - w + 1 n
+      i1 = size(array,2) - block%mesh%lon_halo_width + 1
+      i2 = size(array,2)
+      array(:,i1:i2) = 0.0d0
+    end if
+
+  end subroutine zero_halo_1d_r8
+
   subroutine overlay_inner_halo(block, array, west_halo, east_halo)
 
     type(block_type), intent(in) :: block
@@ -529,6 +991,41 @@ contains
 
   end subroutine overlay_inner_halo
 
+  subroutine overlay_inner_halo_member(block, array, west_halo, east_halo)
+
+    type(block_type), intent(in) :: block
+    real(8), intent(inout) :: array(:,:)
+    logical, intent(in), optional :: west_halo
+    logical, intent(in), optional :: east_halo
+
+    integer i1, i2, i3, i4
+    integer status(MPI_STATUS_SIZE), ierr
+    real(8) buffer(block%member_num , block%mesh%lon_halo_width)
+    integer nm
+
+    if (merge(west_halo, .false., present(west_halo))) then
+      !   west halo |           |                       | east_halo
+      !  ___________|___________|_______________________|___________
+      ! |     |     |     |     |     |     |     |     |     |     |
+      ! |     |     | i3  | i4  |     |     |     |     | i1  | i2  |
+      ! |_____|_____|_____|_____|_____|_____|_____|_____|_____|_____|
+      !                |                                   |
+      !              1 + w                             n - w + 1
+      
+      nm = size(array,1) 
+
+      i1 = size(array,2) - block%mesh%lon_halo_width + 1
+      i2 = i1 + block%mesh%lon_halo_width - 1
+      i3 =  1 + block%mesh%lon_halo_width
+      i4 = i3 + block%mesh%lon_halo_width - 1
+      call MPI_SENDRECV(array(:,i1:i2), block%mesh%lon_halo_width * nm, block%halo(east)%dtype, block%halo(east)%proc_id, 19, &
+                        buffer        , block%mesh%lon_halo_width * nm, block%halo(west)%dtype, block%halo(west)%proc_id, 19, &
+                        proc%comm, status, ierr)
+      array(:,i3:i4) = array(:,i3:i4) + buffer
+    end if
+
+  end subroutine overlay_inner_halo_member
+
   subroutine zonal_sum_0d_r8(comm, value)
 
     integer, intent(in) :: comm
@@ -555,6 +1052,19 @@ contains
 
   end subroutine zonal_sum_1d_r8
 
+  subroutine zonal_sum_2d_r8(comm, value)
+
+    integer, intent(in) :: comm
+    real(8), intent(inout) :: value(:)
+
+    integer ierr
+    real(8) res(size(value,1) , size(value,2))
+
+    call MPI_ALLREDUCE(value, res, size(value), MPI_DOUBLE, MPI_SUM, comm, ierr)
+    value = res
+
+  end subroutine zonal_sum_2d_r8
+
   subroutine zonal_sum_ensure_order_1d_r8(comm, value , sum)
 
     integer, intent(in) :: comm
@@ -578,7 +1088,6 @@ contains
 
       
       if (proc%cart_coords(1) == 0) then  !root proc
-        !write(*,*) "here root" , proc%id
         allocate(allvalue(global_mesh%num_full_lon))
         allvalue(1:size(value)) = value(:)
         do i = 1 , numproc - 1
@@ -592,17 +1101,60 @@ contains
         end do
         deallocate(allvalue)
       else !other proc
-        !write(*,*) "here other" , proc%id
         call MPI_SEND(value(:) , size(value) , MPI_DOUBLE , 0 , 0 , comm , ierr)
         call MPI_RECV(sum , 1 , MPI_DOUBLE , 0 , 0 , comm , status,ierr)
       end if  
 
     end if
 
-    ! call MPI_ALLREDUCE(value, res, size(value), MPI_DOUBLE, MPI_SUM, comm, ierr)
-    ! value = res
-
   end subroutine zonal_sum_ensure_order_1d_r8
+
+  subroutine zonal_sum_ensure_order_2d_r8(comm, value , sum)
+
+    integer, intent(in) :: comm
+    real(8), intent(in) :: value(:,:)
+    real(8), intent(out):: sum(:) 
+
+    integer status(MPI_STATUS_SIZE), ierr
+    integer numproc 
+    integer i , nm , nx
+    real(8), allocatable :: allvalue(:,:)  
+
+
+    call MPI_COMM_SIZE(comm,numproc,ierr)
+    sum = 0.0_r8
+    nm  = size(value,1)
+    nx  = size(value,2)
+
+
+    if (numproc == 1) then
+      do i = 1 , nx
+        sum = sum + value(:,i)
+      end do
+    else
+
+      
+      if (proc%cart_coords(1) == 0) then  !root proc
+        allocate(allvalue(global_mesh%num_full_lon))
+        allvalue(:,1:nx) = value
+        do i = 1 , numproc - 1
+          call MPI_RECV(allvalue( : , i * nx + 1 : (i+1)  * nx ) , nx * nm , MPI_DOUBLE , i  , 0 , comm , status,ierr)
+        end do
+        do i = 1 , global_mesh%num_full_lon
+          sum = sum + allvalue(:,i)
+        end do
+        do i = 1 , numproc - 1
+          call MPI_SEND(sum , nm , MPI_DOUBLE , i , 0 , comm , status,ierr)
+        end do
+        deallocate(allvalue)
+      else !other proc
+        call MPI_SEND(value(:,:) , nx * nm , MPI_DOUBLE , 0 , 0 , comm , ierr)
+        call MPI_RECV(sum , nm , MPI_DOUBLE , 0 , 0 , comm , status,ierr)
+      end if  
+
+    end if
+
+  end subroutine zonal_sum_ensure_order_2d_r8
 
   subroutine global_sum_0d_r8(comm, value)
 
@@ -616,6 +1168,19 @@ contains
     value = res
 
   end subroutine global_sum_0d_r8
+
+  subroutine global_sum_1d_r8(comm, value)
+
+    integer, intent(in) :: comm
+    real(8), intent(inout) :: value(:)
+
+    integer ierr
+    real(8) res(size(value))
+
+    call MPI_ALLREDUCE(value, res, size(value), MPI_DOUBLE, MPI_SUM, comm, ierr)
+    value = res
+
+  end subroutine global_sum_1d_r8
 
   subroutine barrier()
 
