@@ -36,16 +36,16 @@ module process_mod
     integer :: lon_iend = inf_i4
     integer :: lat_ibeg = inf_i4
     integer :: lat_iend = inf_i4
-  contains
+  contains  ! 类含有的成员函数
     procedure :: init => process_neighbor_init
   end type process_neighbor_type
 
   type process_type
     integer np
-    integer num_proc_lon_normal_region
-    integer num_proc_lat_normal_region
-    integer num_proc_lat_reduce_region
-    integer decomp_type
+    integer num_proc_lon_normal_region  ! 非简并区 纬向划分 进程数
+    integer num_proc_lat_normal_region  ! 非简并区 经向划分 进程数
+    integer num_proc_lat_reduce_region  ! 简并区   纬向划分 进程数
+    integer decomp_type                 ! 一维or二维划分？
     integer decomp_loc
     integer :: comm           = MPI_COMM_NULL
     integer :: cart_comm      = MPI_COMM_NULL
@@ -68,7 +68,7 @@ module process_mod
     type(block_type), allocatable :: blocks(:)
   end type process_type
 
-  type(process_type) proc
+  type(process_type) proc ! 每个进程
 
 contains
 
@@ -84,9 +84,9 @@ contains
       call MPI_INIT(ierr)
       proc%comm = MPI_COMM_WORLD
     end if
-    call MPI_COMM_GROUP(proc%comm, proc%group, ierr)
+    call MPI_COMM_GROUP(proc%comm, proc%group, ierr)  ! Accesses the group associated with given communicator
 
-    call setup_mpi_1d_lat()
+    call setup_mpi_1d_lat()   ! 一维划分？
     call decompose_domains()
     call setup_zonal_comm_for_reduce()
 
