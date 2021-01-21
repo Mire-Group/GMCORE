@@ -219,36 +219,37 @@ contains
           end do
         end do
       end do
-#ifndef V_POLE
-      if (mesh%has_south_pole()) then
-        j = mesh%full_lat_ibeg
-        pole = 0.0_r8
-        do k = mesh%half_lev_ibeg, mesh%half_lev_iend
-          do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-            pole(k) = pole(k) + mf_lev_lat_n(i,j,k) * (gz_lev_lat(i,j,k) - gz_lev(i,j,k))
+      #ifndef V_POLE
+        if (mesh%has_south_pole()) then
+          j = mesh%full_lat_ibeg
+          pole = 0.0_r8
+          do k = mesh%half_lev_ibeg, mesh%half_lev_iend
+            do i = mesh%full_lon_ibeg, mesh%full_lon_iend
+              pole(k) = pole(k) + mf_lev_lat_n(i,j,k) * (gz_lev_lat(i,j,k) - gz_lev(i,j,k))
+            end do
           end do
-        end do
-        call zonal_sum(proc%zonal_comm, pole)
-        pole = pole * mesh%le_lat(j) / global_mesh%num_full_lon / mesh%area_cell(j)
-        do k = mesh%half_lev_ibeg, mesh%half_lev_iend
-          do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-            adv_gz_lat(i,j,k) = pole(k) / m_lev(i,j,k) / global_mesh%num_full_lon
+          call zonal_sum(proc%zonal_comm, pole)
+          pole = pole * mesh%le_lat(j) / global_mesh%num_full_lon / mesh%area_cell(j)
+          do k = mesh%half_lev_ibeg, mesh%half_lev_iend
+            do i = mesh%full_lon_ibeg, mesh%full_lon_iend
+              adv_gz_lat(i,j,k) = pole(k) / m_lev(i,j,k) / global_mesh%num_full_lon
+            end do
           end do
-        end do
-      end if
-      if (mesh%has_north_pole()) then
-        j = mesh%full_lat_iend
-        pole = 0.0_r8
-        do k = mesh%half_lev_ibeg, mesh%half_lev_iend
-          do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-            pole(k) = pole(k) - mf_lev_lat_n(i,j-1,k) * (gz_lev_lat(i,j-1,k) - gz_lev(i,j,k))
+        end if
+        if (mesh%has_north_pole()) then
+          j = mesh%full_lat_iend
+          pole = 0.0_r8
+          do k = mesh%half_lev_ibeg, mesh%half_lev_iend
+            do i = mesh%full_lon_ibeg, mesh%full_lon_iend
+              pole(k) = pole(k) - mf_lev_lat_n(i,j-1,k) * (gz_lev_lat(i,j-1,k) - gz_lev(i,j,k))
+            end do
           end do
-        end do
-        call zonal_sum(proc%zonal_comm, pole)
-        pole = pole * mesh%le_lat(j-1) / global_mesh%num_full_lon / mesh%area_cell(j)
-        do k = mesh%half_lev_ibeg, mesh%half_lev_iend
-          do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-            adv_gz_lat(i,j,k) = pole(k) / m_lev(i,j,k) / global_mesh%num_full_lon
+          call zonal_sum(proc%zonal_comm, pole)
+          pole = pole * mesh%le_lat(j-1) / global_mesh%num_full_lon / mesh%area_cell(j)
+          do k = mesh%half_lev_ibeg, mesh%half_lev_iend
+            do i = mesh%full_lon_ibeg, mesh%full_lon_iend
+              adv_gz_lat(i,j,k) = pole(k) / m_lev(i,j,k) / global_mesh%num_full_lon
+            end do
           end do
         end if
       #endif
@@ -272,20 +273,19 @@ contains
           adv_gz_lev(i,j,k) = wedphdlev(i,j,k) * (gz(i,j,k) - gz_lev(i,j,k)) / m_lev(i,j,k)
         end do
       end do
-      ! Bottom gz is static topography, so no tendency for it (i.e., gzs).
       k = mesh%half_lev_iend
       do j = mesh%full_lat_ibeg, mesh%full_lat_iend
         do i = mesh%full_lon_ibeg, mesh%full_lon_iend
           adv_gz_lev(i,j,k) = wedphdlev(i,j,k-1) * (gz_lev(i,j,k) - gz(i,j,k-1)) / m_lev(i,j,k)
         end do
       end do
-#ifndef V_POLE
-      if (mesh%has_south_pole()) then
-        j = mesh%full_lat_ibeg
-        do k = mesh%full_lev_ibeg, mesh%full_lev_iend
-          do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-            adv_gz_lev(i,j,k) = adv_gz_lev(i,j,k) / global_mesh%num_full_lon
-          end do
+      #ifndef V_POLE
+        if (mesh%has_south_pole()) then
+          j = mesh%full_lat_ibeg
+          do k = mesh%full_lev_ibeg, mesh%full_lev_iend
+            do i = mesh%full_lon_ibeg, mesh%full_lon_iend
+              adv_gz_lev(i,j,k) = adv_gz_lev(i,j,k) / global_mesh%num_full_lon
+            end do
         end if
         if (mesh%has_north_pole()) then
           j = mesh%full_lat_iend
@@ -376,36 +376,37 @@ contains
           end do
         end do
       end do
-#ifndef V_POLE
-      if (mesh%has_south_pole()) then
-        j = mesh%full_lat_ibeg
-        pole = 0.0_r8
-        do k = mesh%half_lev_ibeg + 1, mesh%half_lev_iend - 1
-          do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-            pole(k) = pole(k) + mf_lev_lat_n(i,j,k) * (w_lev_lat(i,j,k) - w_lev(i,j,k))
+      #ifndef V_POLE
+        if (mesh%has_south_pole()) then
+          j = mesh%full_lat_ibeg
+          pole = 0.0_r8
+          do k = mesh%half_lev_ibeg + 1, mesh%half_lev_iend - 1
+            do i = mesh%full_lon_ibeg, mesh%full_lon_iend
+              pole(k) = pole(k) + mf_lev_lat_n(i,j,k) * (w_lev_lat(i,j,k) - w_lev(i,j,k))
+            end do
           end do
-        end do
-        call zonal_sum(proc%zonal_comm, pole)
-        pole = pole * mesh%le_lat(j) / global_mesh%num_full_lon / mesh%area_cell(j)
-        do k = mesh%half_lev_ibeg + 1, mesh%half_lev_iend - 1
-          do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-            adv_w_lat(i,j,k) = pole(k) / m_lev(i,j,k) / global_mesh%num_full_lon
+          call zonal_sum(proc%zonal_comm, pole)
+          pole = pole * mesh%le_lat(j) / global_mesh%num_full_lon / mesh%area_cell(j)
+          do k = mesh%half_lev_ibeg + 1, mesh%half_lev_iend - 1
+            do i = mesh%full_lon_ibeg, mesh%full_lon_iend
+              adv_w_lat(i,j,k) = pole(k) / m_lev(i,j,k) / global_mesh%num_full_lon
+            end do
           end do
-        end do
-      end if
-      if (mesh%has_north_pole()) then
-        j = mesh%full_lat_iend
-        pole = 0.0_r8
-        do k = mesh%half_lev_ibeg + 1, mesh%half_lev_iend - 1
-          do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-            pole(k) = pole(k) - mf_lev_lat_n(i,j-1,k) * (w_lev_lat(i,j-1,k) - w_lev(i,j,k))
+        end if
+        if (mesh%has_north_pole()) then
+          j = mesh%full_lat_iend
+          pole = 0.0_r8
+          do k = mesh%half_lev_ibeg + 1, mesh%half_lev_iend - 1
+            do i = mesh%full_lon_ibeg, mesh%full_lon_iend
+              pole(k) = pole(k) - mf_lev_lat_n(i,j-1,k) * (w_lev_lat(i,j-1,k) - w_lev(i,j,k))
+            end do
           end do
-        end do
-        call zonal_sum(proc%zonal_comm, pole)
-        pole = pole * mesh%le_lat(j-1) / global_mesh%num_full_lon / mesh%area_cell(j)
-        do k = mesh%half_lev_ibeg + 1, mesh%half_lev_iend - 1
-          do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-            adv_w_lat(i,j,k) = pole(k) / m_lev(i,j,k) / global_mesh%num_full_lon
+          call zonal_sum(proc%zonal_comm, pole)
+          pole = pole * mesh%le_lat(j-1) / global_mesh%num_full_lon / mesh%area_cell(j)
+          do k = mesh%half_lev_ibeg + 1, mesh%half_lev_iend - 1
+            do i = mesh%full_lon_ibeg, mesh%full_lon_iend
+              adv_w_lat(i,j,k) = pole(k) / m_lev(i,j,k) / global_mesh%num_full_lon
+            end do
           end do
         end if
       #endif
@@ -425,20 +426,21 @@ contains
       end do
       ! Top w is fixed to be zero.
       ! Bottom w is from boundary condition, so no tendency for it.
-#ifndef V_POLE
-      if (mesh%has_south_pole()) then
-        j = mesh%full_lat_ibeg
-        do k = mesh%half_lev_ibeg, mesh%half_lev_iend
-          do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-            adv_w_lev(i,j,k) = adv_w_lev(i,j,k) / global_mesh%num_full_lon
+      #ifndef V_POLE
+        if (mesh%has_south_pole()) then
+          j = mesh%full_lat_ibeg
+          do k = mesh%half_lev_ibeg, mesh%half_lev_iend
+            do i = mesh%full_lon_ibeg, mesh%full_lon_iend
+              adv_w_lev(i,j,k) = adv_w_lev(i,j,k) / global_mesh%num_full_lon
+            end do
           end do
-        end do
-      end if
-      if (mesh%has_north_pole()) then
-        j = mesh%full_lat_iend
-        do k = mesh%half_lev_ibeg, mesh%half_lev_iend
-          do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-            adv_w_lev(i,j,k) = adv_w_lev(i,j,k) / global_mesh%num_full_lon
+        end if
+        if (mesh%has_north_pole()) then
+          j = mesh%full_lat_iend
+          do k = mesh%half_lev_ibeg, mesh%half_lev_iend
+            do i = mesh%full_lon_ibeg, mesh%full_lon_iend
+              adv_w_lev(i,j,k) = adv_w_lev(i,j,k) / global_mesh%num_full_lon
+            end do
           end do
         end if
       #endif
