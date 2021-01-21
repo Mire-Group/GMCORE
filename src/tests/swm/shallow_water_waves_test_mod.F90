@@ -51,6 +51,7 @@ module shallow_water_waves_test_mod
 
   use flogger
   use string
+  use namelist_mod
   use const_mod, only: inf
   use parallel_mod
   use block_mod
@@ -95,16 +96,16 @@ contains
 
     type(block_type), intent(inout), target :: block
 
-    real(dp), allocatable :: u(:,:,:), v(:,:,:), h(:,:,:)
+    real(dp), allocatable :: u(:,:,:,:), v(:,:,:,:), h(:,:,:,:)
     real(dp) C
     integer i, j
     type(mesh_type), pointer :: mesh
 
     mesh => block%mesh
 
-    allocate(u(mesh%half_lon_lb:mesh%half_lon_ub,mesh%full_lat_lb:mesh%full_lat_ub,1))
-    allocate(v(mesh%full_lon_lb:mesh%full_lon_ub,mesh%half_lat_lb:mesh%half_lat_ub,1))
-    allocate(h(mesh%full_lon_lb:mesh%full_lon_ub,mesh%full_lat_lb:mesh%full_lat_ub,1))
+    allocate(u(member_num , mesh%half_lon_lb:mesh%half_lon_ub,mesh%full_lat_lb:mesh%full_lat_ub,1))
+    allocate(v(member_num , mesh%full_lon_lb:mesh%full_lon_ub,mesh%half_lat_lb:mesh%half_lat_ub,1))
+    allocate(h(member_num , mesh%full_lon_lb:mesh%full_lon_ub,mesh%full_lat_lb:mesh%full_lat_ub,1))
     call getFields(mesh%full_lat(mesh%full_lat_lb:mesh%full_lat_ub), &
                    mesh%full_lon(mesh%full_lon_lb:mesh%full_lon_ub), &
                    mesh%half_lat(mesh%half_lat_lb:mesh%half_lat_ub), &
@@ -114,27 +115,27 @@ contains
 
     do j = mesh%full_lat_ibeg, mesh%full_lat_iend
       do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-        block%state(1)%gz(i,j,1) = g * h(i,j,1) + 5.0d4
+        block%state(1)%gz(:,i,j,1) = g * h(:,i,j,1) + 5.0d4
       end do
     end do
 
-    call fill_halo(block, block%state(1)%gz, full_lon=.true., full_lat=.true.)
+    call fill_halo_member(block, block%state(1)%gz, full_lon=.true., full_lat=.true.)
 
     do j = mesh%full_lat_ibeg, mesh%full_lat_iend
       do i = mesh%half_lon_ibeg, mesh%half_lon_iend
-        block%state(1)%u(i,j,1) = u(i,j,1)
+        block%state(1)%u(:,i,j,1) = u(:,i,j,1)
       end do
     end do
 
-    call fill_halo(block, block%state(1)%u, full_lon=.false., full_lat=.true.)
+    call fill_halo_member(block, block%state(1)%u, full_lon=.false., full_lat=.true.)
 
     do j = mesh%half_lat_ibeg, mesh%half_lat_iend
       do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-        block%state(1)%v(i,j,1) = v(i,j,1)
+        block%state(1)%v(:,i,j,1) = v(:,i,j,1)
       end do
     end do
 
-    call fill_halo(block, block%state(1)%v, full_lon=.true., full_lat=.false.)
+    call fill_halo_member(block, block%state(1)%v, full_lon=.true., full_lat=.false.)
 
     deallocate(u)
     deallocate(v)
@@ -292,9 +293,9 @@ contains
     real(kind=dp), intent(in)    :: ilat(:)             ! latitude (rad)
     real(kind=dp), intent(in)    :: ilon(:)             ! longitude (rad)
     real(kind=dp), intent(in)    :: time(:)             ! time (sec)
-    real(kind=dp), intent(inout) :: u(:,:,:)            ! zonal velocity field
-    real(kind=dp), intent(inout) :: v(:,:,:)            ! meridional velocity field
-    real(kind=dp), intent(inout) :: h(:,:,:)            ! free-surface height anomaly field
+    real(kind=dp), intent(inout) :: u(:,:,:,:)            ! zonal velocity field
+    real(kind=dp), intent(inout) :: v(:,:,:,:)            ! meridional velocity field
+    real(kind=dp), intent(inout) :: h(:,:,:,:)            ! free-surface height anomaly field
 
     real(kind=dp)                :: uTilde(size(lat))   ! see Eq. 18 in text
     real(kind=dp)                :: vTilde(size(lat))   ! see Eqs. 12a and 15b in text
@@ -310,7 +311,7 @@ contains
     do n=1,size(time)
        do j=1,size(lat)
           do i=1,size(ilon)
-             u(i,j,n) = uTilde(j) * &
+             u(:,i,j,n) = uTilde(j) * &
                  cos( k * ilon(i) - k * C * time(n) )
           end do
        end do
@@ -319,11 +320,11 @@ contains
        do j=1,size(ilat)
           do i=1,size(lon)
 #ifdef V_POLE
-             v(i,j,n) = vTilde(j) * &
-                 cos( k * lon(i) - k * C * time(n) - 0.5_dp * pi )
+            !  v(i,j,n) = vTilde(j) * &
+            !      cos( k * lon(i) - k * C * time(n) - 0.5_dp * pi )
 #else
              if (j < size(ilat)) then
-               v(i,j,n) = (vTilde(j) + vTilde(j+1)) * 0.5_dp * &
+               v(:,i,j,n) = (vTilde(j) + vTilde(j+1)) * 0.5_dp * &
                    cos( k * lon(i) - k * C * time(n) - 0.5_dp * pi )
              end if
 #endif
@@ -333,7 +334,7 @@ contains
     do n=1,size(time)
       do j=1,size(lat)
          do i=1,size(lon)
-            h(i,j,n)   = hTilde(j) * &
+            h(:,i,j,n)   = hTilde(j) * &
                  cos( k * lon(i) - k * C * time(n) )
           end do
        end do

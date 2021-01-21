@@ -103,7 +103,7 @@ contains
   subroutine gmcore_run()
 
     call operators_prepare(proc%blocks, old, dt_in_seconds)
-    call diagnose(proc%blocks, old)
+    call diagnose(proc%blocks, old, 1)
     call output(old)
 
     do while (.not. time_is_finished())
@@ -112,7 +112,7 @@ contains
       !if (is_root_proc()) call log_print_diag(curr_time%isoformat())
       call time_advance(dt_in_seconds)
       call operators_prepare(proc%blocks, old, dt_in_seconds)
-      call diagnose(proc%blocks, old)
+      call diagnose(proc%blocks, old, 1)
       call output(old)
     end do
 
@@ -153,25 +153,26 @@ contains
           end associate
         end do
       end if
-      call history_write_state(proc%blocks, itime)
-      call history_write_debug(proc%blocks, itime)
+      call history_write_state(proc%blocks, itime, member_num)
+      call history_write_debug(proc%blocks, itime, member_num)
     end if
     if (time_is_alerted('restart_write')) then
-      call restart_write(itime)
+      call restart_write(itime , member_num)
     end if
 
   end subroutine output
 
-  subroutine diagnose(blocks, itime)
+  subroutine diagnose(blocks, itime , member_output)
 
     type(block_type), intent(inout), target :: blocks(:)
     integer, intent(in) :: itime
+    integer, intent(in) :: member_output
 
     type(mesh_type), pointer :: mesh
     type(state_type), pointer :: state
     type(static_type), pointer :: static
     integer i, j, k, iblk
-    real(r8) tm, te, tav, tpe
+    real(r8) tm(member_num), te(member_num), tav(member_num), tpe(member_num)
 
     tm = 0.0_r8
     te = 0.0_r8
@@ -185,7 +186,7 @@ contains
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
         do j = mesh%full_lat_ibeg, mesh%full_lat_iend
           do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-            tm = tm + state%m(i,j,k) * mesh%area_cell(j)
+            tm(:) = tm(:) + state%m(:,i,j,k) * mesh%area_cell(j)
           end do
         end do
       end do
@@ -193,12 +194,12 @@ contains
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
         do j = mesh%full_lat_ibeg_no_pole, mesh%full_lat_iend_no_pole
           do i = mesh%half_lon_ibeg, mesh%half_lon_iend
-            te = te + state%mf_lon_n(i,j,k) * 0.5_r8 * state%u(i,j,k) * mesh%area_lon(j) * 2
+            te(:) = te(:) + state%mf_lon_n(:,i,j,k) * 0.5_r8 * state%u(:,i,j,k) * mesh%area_lon(j) * 2
           end do
         end do
         do j = mesh%half_lat_ibeg_no_pole, mesh%half_lat_iend_no_pole
           do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-            te = te + state%mf_lat_n(i,j,k) * 0.5_r8 * state%v(i,j,k) * mesh%area_lat(j) * 2
+            te(:) = te(:) + state%mf_lat_n(:,i,j,k) * 0.5_r8 * state%v(:,i,j,k) * mesh%area_lat(j) * 2
           end do
         end do
       end do
@@ -206,19 +207,19 @@ contains
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
           do j = mesh%full_lat_ibeg, mesh%full_lat_iend
             do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-              te = te + state%m(i,j,k) * cp * state%t(i,j,k) * mesh%area_cell(j)
+              te(:) = te(:) + state%m(:,i,j,k) * cp * state%t(:,i,j,k) * mesh%area_cell(j)
             end do
           end do
         end do
         do j = mesh%full_lat_ibeg, mesh%full_lat_iend
           do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-            te = te + static%gzs(i,j) * state%phs(i,j) * mesh%area_cell(j)
+            te(:) = te(:) + static%gzs(:,i,j) * state%phs(:,i,j) * mesh%area_cell(j)
           end do
         end do
       else if (.not. baroclinic) then
         do j = mesh%full_lat_ibeg, mesh%full_lat_iend
           do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-            te = te + (state%m(i,j,1)**2 * g * 0.5_r8 + state%m(i,j,1) * static%gzs(i,j)) * mesh%area_cell(j)
+            te(:) = te(:) + (state%m(:,i,j,1)**2 * g * 0.5_r8 + state%m(:,i,j,1) * static%gzs(:,i,j)) * mesh%area_cell(j)
           end do
         end do
       end if
@@ -226,7 +227,7 @@ contains
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
         do j = mesh%half_lat_ibeg, mesh%half_lat_iend
           do i = mesh%half_lon_ibeg, mesh%half_lon_iend
-            tav = tav + state%pv(i,j,k) * mesh%area_vtx(j)
+            tav(:) = tav(:) + state%pv(:,i,j,k) * mesh%area_vtx(j)
           end do
         end do
       end do
@@ -234,12 +235,12 @@ contains
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
         do j = mesh%full_lat_ibeg_no_pole, mesh%full_lat_iend_no_pole
           do i = mesh%half_lon_ibeg, mesh%half_lon_iend
-            tpe = tpe + state%m_lon(i,j,k) * state%pv_lon(i,j,k)**2 * 0.5_r8 * mesh%area_lon(j)
+            tpe(:) = tpe(:) + state%m_lon(:,i,j,k) * state%pv_lon(:,i,j,k)**2 * 0.5_r8 * mesh%area_lon(j)
           end do
         end do
         do j = mesh%half_lat_ibeg_no_pole, mesh%half_lat_iend_no_pole
           do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-            tpe = tpe + state%m_lat(i,j,k) * state%pv_lat(i,j,k)**2 * 0.5_r8 * mesh%area_lat(j)
+            tpe(:) = tpe(:) + state%m_lat(:,i,j,k) * state%pv_lat(:,i,j,k)**2 * 0.5_r8 * mesh%area_lat(j)
           end do
         end do
       end do
@@ -256,9 +257,9 @@ contains
       blocks(iblk)%state(itime)%tpe = tpe
     end do
 
-    call log_add_diag('tm' , tm )
-    call log_add_diag('te' , te )
-    call log_add_diag('tpe', tpe)
+    call log_add_diag('tm' , tm(member_output) )
+    call log_add_diag('te' , te(member_output) )
+    call log_add_diag('tpe', tpe(member_output) )
 
   end subroutine diagnose
 
@@ -293,19 +294,19 @@ contains
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
           do j = mesh%full_lat_ibeg_no_pole, mesh%full_lat_iend_no_pole
             do i = mesh%half_lon_ibeg, mesh%half_lon_iend
-              tend%du(i,j,k) =   tend%qhv(i,j,k) - tend%pgf_lon(i,j,k) - tend%dkedlon(i,j,k) - tend%wedudlev(i,j,k)
+              tend%du(:,i,j,k) =   tend%qhv(:,i,j,k) - tend%pgf_lon(:,i,j,k) - tend%dkedlon(:,i,j,k) - tend%wedudlev(:,i,j,k)
             end do
           end do
 
           do j = mesh%half_lat_ibeg_no_pole, mesh%half_lat_iend_no_pole
             do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-              tend%dv(i,j,k) = - tend%qhu(i,j,k) - tend%pgf_lat(i,j,k) - tend%dkedlat(i,j,k) - tend%wedvdlev(i,j,k)
+              tend%dv(:,i,j,k) = - tend%qhu(:,i,j,k) - tend%pgf_lat(:,i,j,k) - tend%dkedlat(:,i,j,k) - tend%wedvdlev(:,i,j,k)
             end do
           end do
 
           do j = mesh%full_lat_ibeg, mesh%full_lat_iend
             do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-              tend%dpt(i,j,k) = - tend%dptfdlon(i,j,k) - tend%dptfdlat(i,j,k) - tend%dptfdlev(i,j,k)
+              tend%dpt(:,i,j,k) = - tend%dptfdlon(:,i,j,k) - tend%dptfdlat(:,i,j,k) - tend%dptfdlev(:,i,j,k)
             end do
           end do
         end do
@@ -325,19 +326,19 @@ contains
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
           do j = mesh%full_lat_ibeg_no_pole, mesh%full_lat_iend_no_pole
             do i = mesh%half_lon_ibeg, mesh%half_lon_iend
-              tend%du(i,j,k) =   tend%qhv(i,j,k) - tend%pgf_lon(i,j,k) - tend%dkedlon(i,j,k)
+              tend%du(:,i,j,k) =   tend%qhv(:,i,j,k) - tend%pgf_lon(:,i,j,k) - tend%dkedlon(:,i,j,k)
             end do
           end do
 
           do j = mesh%half_lat_ibeg_no_pole, mesh%half_lat_iend_no_pole
             do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-              tend%dv(i,j,k) = - tend%qhu(i,j,k) - tend%pgf_lat(i,j,k) - tend%dkedlat(i,j,k)
+              tend%dv(:,i,j,k) = - tend%qhu(:,i,j,k) - tend%pgf_lat(:,i,j,k) - tend%dkedlat(:,i,j,k)
             end do
           end do
 
           do j = mesh%full_lat_ibeg, mesh%full_lat_iend
             do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-              tend%dgz(i,j,k) = - (tend%dmfdlon(i,j,k) + tend%dmfdlat(i,j,k)) * g
+              tend%dgz(:,i,j,k) = - (tend%dmfdlon(:,i,j,k) + tend%dmfdlat(:,i,j,k)) * g
             end do
           end do
         end do
@@ -353,13 +354,13 @@ contains
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
           do j = mesh%full_lat_ibeg_no_pole, mesh%full_lat_iend_no_pole
             do i = mesh%half_lon_ibeg, mesh%half_lon_iend
-              tend%du(i,j,k) =   tend%qhv(i,j,k)
+              tend%du(:,i,j,k) =   tend%qhv(:,i,j,k)
             end do
           end do
 
           do j = mesh%half_lat_ibeg_no_pole, mesh%half_lat_iend_no_pole
             do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-              tend%dv(i,j,k) = - tend%qhu(i,j,k)
+              tend%dv(:,i,j,k) = - tend%qhu(:,i,j,k)
             end do
           end do
         end do
@@ -374,13 +375,13 @@ contains
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
           do j = mesh%full_lat_ibeg_no_pole, mesh%full_lat_iend_no_pole
             do i = mesh%half_lon_ibeg, mesh%half_lon_iend
-              tend%du(i,j,k) =   tend%qhv(i,j,k)
+              tend%du(:,i,j,k) =   tend%qhv(:,i,j,k)
             end do
           end do
 
           do j = mesh%half_lat_ibeg_no_pole, mesh%half_lat_iend_no_pole
             do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-              tend%dv(i,j,k) = - tend%qhu(i,j,k)
+              tend%dv(:,i,j,k) = - tend%qhu(:,i,j,k)
             end do
           end do
         end do
@@ -403,19 +404,19 @@ contains
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
           do j = mesh%full_lat_ibeg_no_pole, mesh%full_lat_iend_no_pole
             do i = mesh%half_lon_ibeg, mesh%half_lon_iend
-              tend%du(i,j,k) = - tend%wedudlev(i,j,k) - tend%dkedlon(i,j,k) - tend%pgf_lon(i,j,k)
+              tend%du(:,i,j,k) = - tend%wedudlev(:,i,j,k) - tend%dkedlon(:,i,j,k) - tend%pgf_lon(:,i,j,k)
             end do
           end do
 
           do j = mesh%half_lat_ibeg_no_pole, mesh%half_lat_iend_no_pole
             do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-              tend%dv(i,j,k) = - tend%wedvdlev(i,j,k) - tend%dkedlat(i,j,k) - tend%pgf_lat(i,j,k)
+              tend%dv(:,i,j,k) = - tend%wedvdlev(:,i,j,k) - tend%dkedlat(:,i,j,k) - tend%pgf_lat(:,i,j,k)
             end do
           end do
 
           do j = mesh%full_lat_ibeg, mesh%full_lat_iend
             do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-              tend%dpt(i,j,k) = - tend%dptfdlon(i,j,k) - tend%dptfdlat(i,j,k) - tend%dptfdlev(i,j,k)
+              tend%dpt(:,i,j,k) = - tend%dptfdlon(:,i,j,k) - tend%dptfdlat(:,i,j,k) - tend%dptfdlev(:,i,j,k)
             end do
           end do
         end do
@@ -432,19 +433,19 @@ contains
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
           do j = mesh%full_lat_ibeg_no_pole, mesh%full_lat_iend_no_pole
             do i = mesh%half_lon_ibeg, mesh%half_lon_iend
-              tend%du(i,j,k) = - tend%pgf_lon(i,j,k) - tend%dkedlon(i,j,k)
+              tend%du(:,i,j,k) = - tend%pgf_lon(:,i,j,k) - tend%dkedlon(:,i,j,k)
             end do
           end do
 
           do j = mesh%half_lat_ibeg_no_pole, mesh%half_lat_iend_no_pole
             do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-              tend%dv(i,j,k) = - tend%pgf_lat(i,j,k) - tend%dkedlat(i,j,k)
+              tend%dv(:,i,j,k) = - tend%pgf_lat(:,i,j,k) - tend%dkedlat(:,i,j,k)
             end do
           end do
 
           do j = mesh%full_lat_ibeg, mesh%full_lat_iend
             do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-              tend%dgz(i,j,k) = - (tend%dmfdlon(i,j,k) + tend%dmfdlat(i,j,k)) * g
+              tend%dgz(:,i,j,k) = - (tend%dmfdlon(:,i,j,k) + tend%dmfdlat(:,i,j,k)) * g
             end do
           end do
         end do

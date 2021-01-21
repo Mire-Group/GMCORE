@@ -73,7 +73,7 @@ module reduced_types_mod
   end type reduced_mesh_type
 
   type reduced_static_type
-    real(r8), allocatable, dimension(:,:,:) :: gzs
+    real(r8), allocatable, dimension(:,:,:,:) :: gzs
   contains
     final :: reduced_static_final
   end type reduced_static_type

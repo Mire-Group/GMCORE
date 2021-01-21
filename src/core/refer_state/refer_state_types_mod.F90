@@ -1,6 +1,7 @@
 module refer_state_types_mod
 
   use const_mod
+  use namelist_mod
   use allocator_mod
   use mesh_mod
   use static_mod
@@ -17,12 +18,12 @@ module refer_state_types_mod
 
   type refer_state_type
     type(mesh_type), pointer :: mesh => null()
-    real(r8), allocatable, dimension(:,:  ) :: phs
-    real(r8), allocatable, dimension(:,:,:) :: ph
-    real(r8), allocatable, dimension(:,:,:) :: gz
-    real(r8), allocatable, dimension(:,:,:) :: t 
-    real(r8), allocatable, dimension(:,:,:) :: pt
-    real(r8), allocatable, dimension(:,:,:) :: rhod
+    real(r8), allocatable, dimension(:,:,:  ) :: phs
+    real(r8), allocatable, dimension(:,:,:,:) :: ph
+    real(r8), allocatable, dimension(:,:,:,:) :: gz
+    real(r8), allocatable, dimension(:,:,:,:) :: t 
+    real(r8), allocatable, dimension(:,:,:,:) :: pt
+    real(r8), allocatable, dimension(:,:,:,:) :: rhod
   contains
     procedure :: init  => refer_state_init
     procedure :: clear => refer_state_clear
@@ -40,12 +41,12 @@ contains
 
     this%mesh => static%mesh
 
-    call allocate_array(this%mesh, this%phs , full_lon=.true., full_lat=.true.)
-    call allocate_array(this%mesh, this%ph  , full_lon=.true., full_lat=.true., full_lev=.true.)
-    call allocate_array(this%mesh, this%gz  , full_lon=.true., full_lat=.true., full_lev=.true.)
-    call allocate_array(this%mesh, this%t   , full_lon=.true., full_lat=.true., full_lev=.true.)
-    call allocate_array(this%mesh, this%pt  , full_lon=.true., full_lat=.true., full_lev=.true.)
-    call allocate_array(this%mesh, this%rhod, full_lon=.true., full_lat=.true., full_lev=.true.)
+    call allocate_array(this%mesh, this%phs , member_num , full_lon=.true., full_lat=.true.)
+    call allocate_array(this%mesh, this%ph  , member_num , full_lon=.true., full_lat=.true., full_lev=.true.)
+    call allocate_array(this%mesh, this%gz  , member_num , full_lon=.true., full_lat=.true., full_lev=.true.)
+    call allocate_array(this%mesh, this%t   , member_num , full_lon=.true., full_lat=.true., full_lev=.true.)
+    call allocate_array(this%mesh, this%pt  , member_num , full_lon=.true., full_lat=.true., full_lev=.true.)
+    call allocate_array(this%mesh, this%rhod, member_num , full_lon=.true., full_lat=.true., full_lev=.true.)
 
   end subroutine refer_state_init
 

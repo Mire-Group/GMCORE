@@ -35,7 +35,7 @@ program gmcore_swm_driver
   call gmcore_init(namelist_path)
 
   if (restart) then
-    call restart_read()
+    call restart_read(member_num)
   else
     select case (test_case)
     case ('mountain_zonal_flow')

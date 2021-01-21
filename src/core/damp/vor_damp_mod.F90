@@ -1,8 +1,9 @@
 module vor_damp_mod
-
+  use mpi
   use flogger
   use string
   use const_mod
+  use process_mod
   use namelist_mod
   use parallel_mod
   use block_mod
@@ -18,6 +19,9 @@ module vor_damp_mod
 
   real(r8), allocatable :: cv_full_lat(:,:)
   real(r8), allocatable :: cv_half_lat(:,:)
+
+  real(r8) , allocatable :: rhs_all(:) , v_all(:)  ! send to solver , one member
+  real(r8) , allocatable :: rhs_tran(:,:) , v_tran(:,:) ! mpi all member
 
   logical, allocatable :: use_implicit_solver(:)
   real(r8), parameter :: beta = 0.5_r8
@@ -47,6 +51,13 @@ contains
 
     allocate(cv_full_lat(global_mesh%num_full_lat,global_mesh%num_full_lev))
     allocate(cv_half_lat(global_mesh%num_half_lat,global_mesh%num_full_lev))
+
+    if (proc%NeedReduce) then
+      allocate(rhs_all(global_mesh%num_full_lon))
+      allocate(v_all(global_mesh%num_full_lon))
+      allocate(rhs_tran(proc%member_num ,global_mesh%num_full_lon)) 
+      allocate(v_tran(proc%member_num , global_mesh%num_full_lon))
+    end if
 
     select case (vor_damp_order)
     case (2)
@@ -111,6 +122,11 @@ contains
     if (allocated(cv_full_lat)) deallocate(cv_full_lat)
     if (allocated(cv_half_lat)) deallocate(cv_half_lat)
 
+    if (allocated(rhs_all))  deallocate(rhs_all)
+    if (allocated(rhs_tran)) deallocate(rhs_tran)
+    if (allocated(v_all))    deallocate(v_all)
+    if (allocated(v_tran))   deallocate(v_tran)
+
     if (allocated(use_implicit_solver)) deallocate(use_implicit_solver)
     if (allocated(zonal_solver)) deallocate(zonal_solver)
 
@@ -123,10 +139,13 @@ contains
     type(state_type), intent(inout) :: state
 
     type(mesh_type), pointer :: mesh
-    real(r8) rhs(block%mesh%full_lon_ibeg:block%mesh%full_lon_iend)
-    integer i, j, k
+    real(r8) rhs(member_num , block%mesh%full_lon_ibeg:block%mesh%full_lon_iend)
+    integer status(MPI_STATUS_SIZE), ierr
+    integer i, j, k, im
+    integer proc_length
 
     mesh => state%mesh
+    proc_length = global_mesh%num_half_lon / proc%cart_dims(1)
 
     select case (vor_damp_order)
     case (2)
@@ -134,46 +153,74 @@ contains
         do j = mesh%full_lat_ibeg_no_pole, mesh%full_lat_iend_no_pole
           do i = mesh%half_lon_ibeg, mesh%half_lon_iend
 #ifdef V_POLE
-            state%u(i,j,k) = state%u(i,j,k) - dt * cv_full_lat(j,k) * ( &
-              state%vor(i,j+1,k) - state%vor(i,j,k)) / mesh%le_lon(j)
+            ! state%u(i,j,k) = state%u(i,j,k) - dt * cv_full_lat(j,k) * ( &
+            !   state%vor(i,j+1,k) - state%vor(i,j,k)) / mesh%le_lon(j)
 #else
-            state%u(i,j,k) = state%u(i,j,k) - dt * cv_full_lat(j,k) * ( &
-              state%vor(i,j,k) - state%vor(i,j-1,k)) / mesh%le_lon(j)
+            state%u(:,i,j,k) = state%u(:,i,j,k) - dt * cv_full_lat(j,k) * ( &
+              state%vor(:,i,j,k) - state%vor(:,i,j-1,k)) / mesh%le_lon(j)
 #endif
           end do
         end do
       end do
-      call fill_halo(block, state%u, full_lon=.false., full_lat=.true., full_lev=.true.)
+      call fill_halo_member(block, state%u, full_lon=.false., full_lat=.true., full_lev=.true.)
 
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
         do j = mesh%half_lat_ibeg_no_pole, mesh%half_lat_iend_no_pole
           if (use_implicit_solver(j)) then
             ! Set right hand side.
             do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-              rhs(i) = state%v(i,j,k) + &
-                       cv_half_lat(j,k) * beta * dt / mesh%le_lat(j) * (       &
-                         state%vor(i,j,k) - state%vor(i-1,j,k)                 &
-                       ) +                                                     &
+              rhs(:,i) = state%v(:,i,j,k) + &
+                         cv_half_lat(j,k) * beta * dt / mesh%le_lat(j) * (       &
+                         state%vor(:,i,j,k) - state%vor(:,i-1,j,k)                 &
+                         ) +                                                     &
                        cv_half_lat(j,k) * (1 - beta) * dt / mesh%le_lat(j) * ( &
 #ifdef V_POLE
-                         state%u(i-1,j,k) - state%u(i-1,j-1,k) -               &
-                         state%u(i  ,j,k) + state%u(i  ,j-1,k)                 &
+                        !  state%u(i-1,j,k) - state%u(i-1,j-1,k) -               &
+                        !  state%u(i  ,j,k) + state%u(i  ,j-1,k)                 &
 #else
-                         state%u(i-1,j+1,k) - state%u(i-1,j,k) -               &
-                         state%u(i  ,j+1,k) + state%u(i  ,j,k)                 &
+                         state%u(:,i-1,j+1,k) - state%u(:,i-1,j,k) -               &
+                         state%u(:,i  ,j+1,k) + state%u(:,i  ,j,k)                 &
 #endif
                        ) / mesh%de_lat(j)
             end do
-            call zonal_solver(j,k)%solve(rhs, state%v(mesh%full_lon_ibeg:mesh%full_lon_iend,j,k))
+
+            if (proc%cart_dims(1) == 1) then
+              do im = 1 , member_num
+                call zonal_solver(j,k)%solve(rhs(im,:), state%v(im , mesh%full_lon_ibeg:mesh%full_lon_iend,j,k) )
+              end do
+            else
+              if (proc%cart_coords(1) == 0) then 
+
+                rhs_tran(:,1:proc_length) = rhs
+
+                do i = 2 , proc%cart_dims(1) 
+                  call MPI_RECV(rhs_tran(: , (i - 1) * proc_length + 1 : i  * proc_length ) , proc_length * member_num , MPI_DOUBLE , proc%id + proc%cart_dims(2) * (i-1)  , 100 , proc%comm , status,ierr)
+                end do
+
+                do im = 1 , member_num
+                  rhs_all = rhs_tran(im , :)
+                  call zonal_solver(j,k)%solve(rhs_all, v_all)
+                  v_tran(im , :) = v_all
+                end do
+
+                do i = 2 , proc%cart_dims(1) 
+                  call MPI_SEND(v_tran(: ,(i - 1) * proc_length + 1 : i  * proc_length) , proc_length * member_num , MPI_DOUBLE , proc%id + proc%cart_dims(2) * (i-1) , 100 , proc%comm , status,ierr)
+                end do
+                state%v(:,mesh%full_lon_ibeg:mesh%full_lon_iend,j,k) = v_tran(: ,1:proc_length)
+              else
+                call MPI_SEND(rhs , size(rhs) , MPI_DOUBLE , proc%id - proc%cart_dims(2) * proc%cart_coords(1) , 100 , proc%comm , ierr)
+                call MPI_RECV(state%v(:,mesh%full_lon_ibeg:mesh%full_lon_iend,j,k) , proc_length * member_num , MPI_DOUBLE , proc%id - proc%cart_dims(2) * proc%cart_coords(1) , 100 , proc%comm , status,ierr)
+              end if
+            end if
           else
             do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-              state%v(i,j,k) = state%v(i,j,k) + dt * cv_half_lat(j,k) * ( &
-                state%vor(i,j,k) - state%vor(i-1,j,k)) / mesh%le_lat(j)
+              state%v(:,i,j,k) = state%v(:,i,j,k) + dt * cv_half_lat(j,k) * ( &
+                state%vor(:,i,j,k) - state%vor(:,i-1,j,k)) / mesh%le_lat(j)
             end do
           end if
         end do
       end do
-      call fill_halo(block, state%v, full_lon=.true., full_lat=.false., full_lev=.true.)
+      call fill_halo_member(block, state%v, full_lon=.true., full_lat=.false., full_lev=.true.)
     case (4)
     end select
 

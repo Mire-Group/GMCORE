@@ -1,6 +1,7 @@
 module rossby_haurwitz_wave_test_mod
 
   use flogger
+  use namelist_mod
   use const_mod
   use parallel_mod
   use block_mod
@@ -34,12 +35,12 @@ contains
 
     real(r8) lon, cos_lat, sin_lat
     real(r8) a, b, c
-    integer i, j
+    integer i, j,im 
     type(mesh_type), pointer :: mesh
 
     mesh => block%mesh
 
-    block%static%gzs(:,:) = 0.0
+    block%static%gzs(:,:,:) = 0.0
 
     do j = mesh%full_lat_ibeg, mesh%full_lat_iend
       cos_lat = mesh%full_cos_lat(j)
@@ -49,10 +50,10 @@ contains
         a = cos_lat
         b = R * cos_lat**(R - 1) * sin_lat**2 * cos(R * lon)
         c = cos_lat**(R + 1) * cos(R * lon)
-        block%state(1)%u(i,j,1) = radius * omg * (a + b - c)
+        block%state(1)%u(:,i,j,1) = radius * omg * (a + b - c)
       end do
     end do
-    call fill_halo(block, block%state(1)%u, full_lon=.false., full_lat=.true.)
+    call fill_halo_member(block, block%state(1)%u, full_lon=.false., full_lat=.true.)
 
     do j = mesh%half_lat_ibeg, mesh%half_lat_iend
       cos_lat = mesh%half_cos_lat(j)
@@ -60,10 +61,10 @@ contains
       do i = mesh%full_lon_ibeg, mesh%full_lon_iend
         lon = mesh%full_lon(i)
         a = R * cos_lat**(R - 1) * sin_lat * sin(R * lon)
-        block%state(1)%v(i,j,1) = - radius * omg * a
+        block%state(1)%v(:,i,j,1) = - radius * omg * a
       end do
     end do
-    call fill_halo(block, block%state(1)%v, full_lon=.true., full_lat=.false.)
+    call fill_halo_member(block, block%state(1)%v, full_lon=.true., full_lat=.false.)
 
     do j = mesh%full_lat_ibeg, mesh%full_lat_iend
       cos_lat = mesh%full_cos_lat(j)
@@ -74,10 +75,10 @@ contains
       c = 0.25 * omg**2 * cos_lat**(2 * R) * ((R + 1) * cos_lat**2 - R - 2)
       do i = mesh%full_lon_ibeg, mesh%full_lon_iend
         lon = mesh%full_lon(i)
-        block%state(1)%gz(i,j,1) = gz0 + radius**2 * (a + b * cos(R * lon) + c * cos(2 * R * lon))
+        block%state(1)%gz(:,i,j,1) = gz0 + radius**2 * (a + b * cos(R * lon) + c * cos(2 * R * lon))
       end do
     end do
-    call fill_halo(block, block%state(1)%gz, full_lon=.true., full_lat=.true.)
+    call fill_halo_member(block, block%state(1)%gz, full_lon=.true., full_lat=.true.)
 
   end subroutine rossby_haurwitz_wave_test_set_initial_condition
 

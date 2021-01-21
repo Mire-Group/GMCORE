@@ -35,9 +35,9 @@ program gmcore_driver
   call gmcore_init(namelist_path)
 
   if (initial_file /= 'N/A') then
-    call initial_read()
+    call initial_read(member_num , initial_file)
   else if (restart) then
-    call restart_read()
+    call restart_read(member_num)
   else
     select case (test_case)
     case ('steady_state')

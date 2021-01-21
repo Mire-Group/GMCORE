@@ -23,21 +23,21 @@ contains
     type(state_type), intent(inout) :: state
 
     integer i, j, k
-    real(r8) ke_vtx(4), pole(state%mesh%num_full_lev)
-    real(r8) order_reduce(state%mesh%full_lon_ibeg : state%mesh%full_lon_iend)
+    real(r8) ke_vtx(4), pole(member_num , state%mesh%num_full_lev)
+    real(r8) order_reduce(member_num , state%mesh%full_lon_ibeg : state%mesh%full_lon_iend)
 
     associate (mesh => block%mesh)
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
         do j = mesh%full_lat_ibeg_no_pole, mesh%full_lat_iend_no_pole
           do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-            state%ke(i,j,k) = (mesh%area_lon_west (j  ) * state%u(i-1,j  ,k)**2 + &
-                               mesh%area_lon_east (j  ) * state%u(i  ,j  ,k)**2 + &
+            state%ke(:,i,j,k) = (mesh%area_lon_west (j  ) * state%u(:,i-1,j  ,k)**2 + &
+                                 mesh%area_lon_east (j  ) * state%u(:,i  ,j  ,k)**2 + &
 #ifdef V_POLE
-                               mesh%area_lat_north(j  ) * state%v(i  ,j  ,k)**2 + &
-                               mesh%area_lat_south(j+1) * state%v(i  ,j+1,k)**2   &
+                              !  mesh%area_lat_north(j  ) * state%v(i  ,j  ,k)**2 + &
+                              !  mesh%area_lat_south(j+1) * state%v(i  ,j+1,k)**2   &
 #else
-                               mesh%area_lat_north(j-1) * state%v(i  ,j-1,k)**2 + &
-                               mesh%area_lat_south(j  ) * state%v(i  ,j  ,k)**2   &
+                               mesh%area_lat_north(j-1) * state%v(:,i  ,j-1,k)**2 + &
+                               mesh%area_lat_south(j  ) * state%v(:,i  ,j  ,k)**2   &
 #endif
                               ) / mesh%area_cell(j)
           end do
@@ -51,14 +51,14 @@ contains
 #ifdef Ensure_Order
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
           do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-            order_reduce(i) = state%v(i,j,k)**2
+            order_reduce(:,i) = state%v(:,i,j,k)**2
           end do
-          call zonal_sum_ensure_order(proc%zonal_comm , order_reduce, pole(k))
+          call zonal_sum_ensure_order(proc%zonal_comm , order_reduce, pole(:,k))
         end do
 #else
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
           do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-            pole(k) = pole(k) + state%v(i,j,k)**2
+            pole(:,k) = pole(:,k) + state%v(:,i,j,k)**2
           end do
         end do
         call zonal_sum(proc%zonal_comm, pole)
@@ -66,7 +66,7 @@ contains
         pole = pole / mesh%num_full_lon * 0.5_r8
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
           do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-            state%ke(i,j,k) = pole(k)
+            state%ke(:,i,j,k) = pole(:,k)
           end do
         end do
       end if
@@ -76,14 +76,14 @@ contains
 #ifdef Ensure_Order
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
           do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-            order_reduce(i) = state%v(i,j-1,k)**2
+            order_reduce(:,i) = state%v(:,i,j-1,k)**2
           end do
-          call zonal_sum_ensure_order(proc%zonal_comm , order_reduce, pole(k))
+          call zonal_sum_ensure_order(proc%zonal_comm , order_reduce, pole(:,k))
         end do
 #else
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
           do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-            pole(k) = pole(k) + state%v(i,j-1,k)**2
+            pole(:,k) = pole(:,k) + state%v(:,i,j-1,k)**2
           end do
         end do
         call zonal_sum(proc%zonal_comm, pole)
@@ -91,12 +91,12 @@ contains
         pole = pole / mesh%num_full_lon * 0.5_r8
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
           do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-            state%ke(i,j,k) = pole(k)
+            state%ke(:,i,j,k) = pole(:,k)
           end do
         end do
       end if
 #endif
-      call fill_halo(block, state%ke, full_lon=.true., full_lat=.true., full_lev=.true., west_halo=.false.)
+      call fill_halo_member(block, state%ke, full_lon=.true., full_lat=.true., full_lev=.true., west_halo=.false.)
     end associate
 
   end subroutine calc_ke

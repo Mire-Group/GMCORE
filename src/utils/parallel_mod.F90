@@ -958,7 +958,7 @@ contains
       array(:,i1:i2) = 0.0d0
     end if
 
-  end subroutine zero_halo_1d_r8
+  end subroutine zero_halo_1d_r8_member
 
   subroutine overlay_inner_halo(block, array, west_halo, east_halo)
 
@@ -1055,7 +1055,7 @@ contains
   subroutine zonal_sum_2d_r8(comm, value)
 
     integer, intent(in) :: comm
-    real(8), intent(inout) :: value(:)
+    real(8), intent(inout) :: value(:,:)
 
     integer ierr
     real(8) res(size(value,1) , size(value,2))
@@ -1135,7 +1135,7 @@ contains
 
       
       if (proc%cart_coords(1) == 0) then  !root proc
-        allocate(allvalue(global_mesh%num_full_lon))
+        allocate(allvalue(proc%member_num , global_mesh%num_full_lon))
         allvalue(:,1:nx) = value
         do i = 1 , numproc - 1
           call MPI_RECV(allvalue( : , i * nx + 1 : (i+1)  * nx ) , nx * nm , MPI_DOUBLE , i  , 0 , comm , status,ierr)

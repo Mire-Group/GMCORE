@@ -1,6 +1,7 @@
 module rayleigh_damp_mod
-
+  
   use const_mod
+  use namelist_mod
   use block_mod
   use parallel_mod
 
@@ -29,16 +30,18 @@ contains
     type(tend_type), intent(inout) :: tend
 
     real(r8) p, z, kr
-    integer i, j, k
+    integer i, j, k, im
 
     associate (mesh => block%mesh)
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
         do j = mesh%full_lat_ibeg_no_pole, mesh%full_lat_iend_no_pole
           do i = mesh%half_lon_ibeg, mesh%half_lon_iend
-            p = 0.5_r8 * (state%ph(i,j,k) + state%ph(i+1,j,k))
-            z = H * log(p0 / p)
-            kr = (1 + tanh((z - z1) / h0)) / tau
-            tend%du(i,j,k) = tend%du(i,j,k) - kr * (state%u(i,j,k) - u0)
+            do im = 1 , member_num
+              p = 0.5_r8 * (state%ph(im,i,j,k) + state%ph(im,i+1,j,k))
+              z = H * log(p0 / p)
+              kr = (1 + tanh((z - z1) / h0)) / tau
+              tend%du(im,i,j,k) = tend%du(im,i,j,k) - kr * (state%u(im,i,j,k) - u0)
+            end do
           end do
         end do
       end do
@@ -46,14 +49,16 @@ contains
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
         do j = mesh%half_lat_ibeg_no_pole, mesh%half_lat_iend_no_pole
           do i = mesh%full_lon_ibeg, mesh%full_lon_iend
+            do im = 1 , member_num
 #ifdef V_POLE
-            p = 0.5_r8 * (state%ph(i,j,k) + state%ph(i,j+1,k))
+              p = 0.5_r8 * (state%ph(im,i,j,k) + state%ph(im,i,j+1,k))
 #else
-            p = 0.5_r8 * (state%ph(i,j,k) + state%ph(i,j-1,k))
+              p = 0.5_r8 * (state%ph(im,i,j,k) + state%ph(im,i,j-1,k))
 #endif
-            z = H * log(p0 / p)
-            kr = (1 + tanh((z - z1) / h0)) / tau
-            tend%dv(i,j,k) = tend%dv(i,j,k) - kr * (state%v(i,j,k) - v0)
+              z = H * log(p0 / p)
+              kr = (1 + tanh((z - z1) / h0)) / tau
+              tend%dv(im,i,j,k) = tend%dv(im,i,j,k) - kr * (state%v(im,i,j,k) - v0)
+            end do
           end do
         end do
       end do
@@ -68,36 +73,40 @@ contains
     type(state_type), intent(inout) :: state
 
     real(r8) p, z, kr
-    integer i, j, k
+    integer i, j, k, im
 
     associate (mesh => block%mesh)
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
         do j = mesh%full_lat_ibeg_no_pole, mesh%full_lat_iend_no_pole
           do i = mesh%half_lon_ibeg, mesh%half_lon_iend
-            p = 0.5_r8 * (state%ph(i,j,k) + state%ph(i+1,j,k))
-            z = H * log(p0 / p)
-            kr = (1 + tanh((z - z1) / h0)) / tau
-            state%u(i,j,k) = state%u(i,j,k) - dt * kr * (state%u(i,j,k) - u0)
+            do im = 1 , member_num
+              p = 0.5_r8 * (state%ph(im,i,j,k) + state%ph(im,i+1,j,k))
+              z = H * log(p0 / p)
+              kr = (1 + tanh((z - z1) / h0)) / tau
+              state%u(im,i,j,k) = state%u(im,i,j,k) - dt * kr * (state%u(im,i,j,k) - u0)
+            end do
           end do
         end do
       end do
-      call fill_halo(block, state%u, full_lon=.false., full_lat=.true., full_lev=.true.)
+      call fill_halo_member(block, state%u, full_lon=.false., full_lat=.true., full_lev=.true.)
 
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
         do j = mesh%half_lat_ibeg_no_pole, mesh%half_lat_iend_no_pole
           do i = mesh%full_lon_ibeg, mesh%full_lon_iend
+            do im = 1 , member_num
 #ifdef V_POLE
-            p = 0.5_r8 * (state%ph(i,j,k) + state%ph(i,j+1,k))
+            ! p = 0.5_r8 * (state%ph(i,j,k) + state%ph(i,j+1,k))
 #else
-            p = 0.5_r8 * (state%ph(i,j,k) + state%ph(i,j-1,k))
+              p = 0.5_r8 * (state%ph(im,i,j,k) + state%ph(im,i,j-1,k))
 #endif
-            z = H * log(p0 / p)
-            kr = (1 + tanh((z - z1) / h0)) / tau
-            state%v(i,j,k) = state%v(i,j,k) - dt * kr * (state%v(i,j,k) - v0)
+              z = H * log(p0 / p)
+              kr = (1 + tanh((z - z1) / h0)) / tau
+              state%v(im,i,j,k) = state%v(im,i,j,k) - dt * kr * (state%v(im,i,j,k) - v0)
+            end do
           end do
         end do
       end do
-      call fill_halo(block, state%v, full_lon=.true., full_lat=.false., full_lev=.true.)
+      call fill_halo_member(block, state%v, full_lon=.true., full_lat=.false., full_lev=.true.)
     end associate
 
   end subroutine rayleigh_damp_run

@@ -124,11 +124,11 @@ contains
 
     integer i, j, k
     type(mesh_type), pointer :: mesh
-    real(r8) ip_cf
-    real(r8) ip_ke, ip_ke_h, ip_ke_v
-    real(r8) ip_pe
-    real(r8) ip_mf
-    real(r8) ip_ptf
+    real(r8) ip_cf(member_num)
+    real(r8) ip_ke(member_num), ip_ke_h(member_num), ip_ke_v(member_num)
+    real(r8) ip_pe(member_num)
+    real(r8) ip_mf(member_num)
+    real(r8) ip_ptf(member_num)
 
     mesh => state%mesh
     ip_cf  = 0.0_r8
@@ -141,11 +141,11 @@ contains
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
         do j = mesh%full_lat_ibeg_no_pole, mesh%full_lat_iend_no_pole
           do i = mesh%half_lon_ibeg, mesh%half_lon_iend
-            ip_cf   = ip_cf   + tend%qhv     (i,j,k) * state%mf_lon_n(i,j,k) * mesh%area_lon(j)
-            ip_ke_h = ip_ke_h + tend%dkedlon (i,j,k) * state%mf_lon_n(i,j,k) * mesh%area_lon(j) * 2
+            ip_cf   = ip_cf   + tend%qhv     (:,i,j,k) * state%mf_lon_n(:,i,j,k) * mesh%area_lon(j)
+            ip_ke_h = ip_ke_h + tend%dkedlon (:,i,j,k) * state%mf_lon_n(:,i,j,k) * mesh%area_lon(j) * 2
             ip_ke_v = ip_ke_v + ( &
-              tend%wedudlev(i,j,k) * state%mf_lon_n(i,j,k) + &
-              0.5_r8 * state%u(i,j,k)**2 * (state%wedphdlev_lev_lon(i,j,k+1) - state%wedphdlev_lev_lon(i,j,k)) &
+              tend%wedudlev(:,i,j,k) * state%mf_lon_n(:,i,j,k) + &
+              0.5_r8 * state%u(:,i,j,k)**2 * (state%wedphdlev_lev_lon(:,i,j,k+1) - state%wedphdlev_lev_lon(:,i,j,k)) &
             ) * mesh%area_lon(j)
           end do
         end do
@@ -154,11 +154,11 @@ contains
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
         do j = mesh%half_lat_ibeg_no_pole, mesh%half_lat_iend_no_pole
           do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-            ip_cf   = ip_cf   - tend%qhu     (i,j,k) * state%mf_lat_n(i,j,k) * mesh%area_lat(j)
-            ip_ke_h = ip_ke_h + tend%dkedlat (i,j,k) * state%mf_lat_n(i,j,k) * mesh%area_lat(j) * 2
+            ip_cf   = ip_cf   - tend%qhu     (:,i,j,k) * state%mf_lat_n(:,i,j,k) * mesh%area_lat(j)
+            ip_ke_h = ip_ke_h + tend%dkedlat (:,i,j,k) * state%mf_lat_n(:,i,j,k) * mesh%area_lat(j) * 2
             ip_ke_v = ip_ke_v + ( &
-              tend%wedvdlev(i,j,k) * state%mf_lat_n(i,j,k) + &
-              0.5_r8 * state%v(i,j,k)**2 * (state%wedphdlev_lev_lat(i,j,k+1) - state%wedphdlev_lev_lat(i,j,k)) &
+              tend%wedvdlev(:,i,j,k) * state%mf_lat_n(:,i,j,k) + &
+              0.5_r8 * state%v(:,i,j,k)**2 * (state%wedphdlev_lev_lat(:,i,j,k+1) - state%wedphdlev_lev_lat(:,i,j,k)) &
             ) * mesh%area_lat(j)
           end do
         end do
@@ -167,8 +167,8 @@ contains
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
         do j = mesh%full_lat_ibeg, mesh%full_lat_iend
           do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-            ip_ke_h = ip_ke_h + (tend%dmfdlon(i,j,k) + tend%dmfdlat(i,j,k)) * state%ke(i,j,k) * mesh%area_cell(j)
-            ip_ptf  = ip_ptf + (tend%dptfdlon(i,j,k) + tend%dptfdlat(i,j,k) + tend%dptfdlev(i,j,k)) * mesh%area_cell(j)
+            ip_ke_h = ip_ke_h + (tend%dmfdlon(:,i,j,k) + tend%dmfdlat(:,i,j,k)) * state%ke(:,i,j,k) * mesh%area_cell(j)
+            ip_ptf  = ip_ptf + (tend%dptfdlon(:,i,j,k) + tend%dptfdlat(:,i,j,k) + tend%dptfdlev(:,i,j,k)) * mesh%area_cell(j)
           end do
         end do
       end do
@@ -189,9 +189,9 @@ contains
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
         do j = mesh%full_lat_ibeg_no_pole, mesh%full_lat_iend_no_pole
           do i = mesh%half_lon_ibeg, mesh%half_lon_iend
-            ip_cf = ip_cf  + tend%qhv    (i,j,k) * state%mf_lon_n(i,j,k) * mesh%area_lon(j)
-            ip_ke = ip_ke + tend%dkedlon(i,j,k) * state%mf_lon_n(i,j,k) * mesh%area_lon(j) * 2
-            ip_pe = ip_pe + tend%pgf_lon(i,j,k) * state%mf_lon_n(i,j,k) * mesh%area_lon(j) * 2
+            ip_cf = ip_cf  + tend%qhv    (:,i,j,k) * state%mf_lon_n(:,i,j,k) * mesh%area_lon(j)
+            ip_ke = ip_ke + tend%dkedlon(:,i,j,k) * state%mf_lon_n(:,i,j,k) * mesh%area_lon(j) * 2
+            ip_pe = ip_pe + tend%pgf_lon(:,i,j,k) * state%mf_lon_n(:,i,j,k) * mesh%area_lon(j) * 2
           end do
         end do
       end do
@@ -199,9 +199,9 @@ contains
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
         do j = mesh%half_lat_ibeg_no_pole, mesh%half_lat_iend_no_pole
           do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-            ip_cf = ip_cf - tend%qhu    (i,j,k) * state%mf_lat_n(i,j,k) * mesh%area_lat(j)
-            ip_ke = ip_ke + tend%dkedlat(i,j,k) * state%mf_lat_n(i,j,k) * mesh%area_lat(j) * 2
-            ip_pe = ip_pe + tend%pgf_lat(i,j,k) * state%mf_lat_n(i,j,k) * mesh%area_lat(j) * 2
+            ip_cf = ip_cf - tend%qhu    (:,i,j,k) * state%mf_lat_n(:,i,j,k) * mesh%area_lat(j)
+            ip_ke = ip_ke + tend%dkedlat(:,i,j,k) * state%mf_lat_n(:,i,j,k) * mesh%area_lat(j) * 2
+            ip_pe = ip_pe + tend%pgf_lat(:,i,j,k) * state%mf_lat_n(:,i,j,k) * mesh%area_lat(j) * 2
           end do
         end do
       end do
@@ -209,9 +209,9 @@ contains
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
         do j = mesh%full_lat_ibeg, mesh%full_lat_iend
           do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-            ip_ke = ip_ke + (tend%dmfdlon(i,j,k) + tend%dmfdlat(i,j,k)) * state%ke(i,j,k) * mesh%area_cell(j)
-            ip_pe = ip_pe + (tend%dmfdlon(i,j,k) + tend%dmfdlat(i,j,k)) * state%gz(i,j,k) * mesh%area_cell(j)
-            ip_mf = ip_mf + (tend%dmfdlon(i,j,k) + tend%dmfdlat(i,j,k)) * mesh%area_cell(j)
+            ip_ke = ip_ke + (tend%dmfdlon(:,i,j,k) + tend%dmfdlat(:,i,j,k)) * state%ke(:,i,j,k) * mesh%area_cell(j)
+            ip_pe = ip_pe + (tend%dmfdlon(:,i,j,k) + tend%dmfdlat(:,i,j,k)) * state%gz(:,i,j,k) * mesh%area_cell(j)
+            ip_mf = ip_mf + (tend%dmfdlon(:,i,j,k) + tend%dmfdlat(:,i,j,k)) * mesh%area_cell(j)
           end do
         end do
       end do

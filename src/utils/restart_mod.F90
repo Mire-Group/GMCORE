@@ -187,15 +187,15 @@ contains
           count = [mesh%num_full_lon,mesh%num_full_lat,mesh%num_full_lev]
 
           call fiona_input(fir0, 'gzs', static%gzs(im,is:ie,js:je), start=start, count=count, time_step=time_step)
-          call fill_halo(block, static%gzs, full_lon=.true., full_lat=.true.)
+          call fill_halo_member(block, static%gzs, full_lon=.true., full_lat=.true.)
           if (baroclinic) then
             call fiona_input(fir0, 'phs', state%phs(im,is:ie,js:je      ), start=start, count=count, time_step=time_step)
-            call fill_halo(block, state%phs, full_lon=.true., full_lat=.true.)
+            call fill_halo_member(block, state%phs, full_lon=.true., full_lat=.true.)
             call fiona_input(fir0, 'pt' , state%pt (im,is:ie,js:je,ks:ke), start=start, count=count, time_step=time_step)
-            call fill_halo(block, state%pt, full_lon=.true., full_lat=.true., full_lev=.true.)
+            call fill_halo_member(block, state%pt, full_lon=.true., full_lat=.true., full_lev=.true.)
           else
             call fiona_input(fir0, 'gz' , state%gz (im,is:ie,js:je,ks:ke), start=start, count=count, time_step=time_step)
-            call fill_halo(block, state%gz, full_lon=.true., full_lat=.true., full_lev=.true.)
+            call fill_halo_member(block, state%gz, full_lon=.true., full_lat=.true., full_lev=.true.)
           end if
 
           is = mesh%half_lon_ibeg; ie = mesh%half_lon_iend
@@ -205,7 +205,7 @@ contains
           count = [mesh%num_half_lon,mesh%num_full_lat,mesh%num_full_lev]
 
           call fiona_input(fir0, 'u'  , state%u(im,is:ie,js:je,ks:ke), start=start, count=count, time_step=time_step)
-          call fill_halo(block, state%u, full_lon=.false., full_lat=.true., full_lev=.true.)
+          call fill_halo_member(block, state%u, full_lon=.false., full_lat=.true., full_lev=.true.)
 
           is = mesh%full_lon_ibeg; ie = mesh%full_lon_iend
           js = mesh%half_lat_ibeg; je = mesh%half_lat_iend
@@ -214,7 +214,7 @@ contains
           count = [mesh%num_full_lon,mesh%num_half_lat,mesh%num_full_lev]
 
           call fiona_input(fir0, 'v'  , state%v(im,is:ie,js:je,ks:ke), start=start, count=count, time_step=time_step)
-          call fill_halo(block, state%v, full_lon=.true., full_lat=.false., full_lev=.true.)
+          call fill_halo_member(block, state%v, full_lon=.true., full_lat=.false., full_lev=.true.)
         end associate
       end do
       call fiona_end_input(fir0)

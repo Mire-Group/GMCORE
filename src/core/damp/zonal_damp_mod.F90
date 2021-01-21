@@ -77,7 +77,8 @@ contains
     type(block_type), intent(in), target :: block
     integer, intent(in) :: order
     real(8), intent(in) :: dt
-    real(r8), intent(inout) :: f(block%mesh%half_lon_lb:block%mesh%half_lon_ub, &
+    real(r8), intent(inout) :: f(member_num ,                                   &
+                                 block%mesh%half_lon_lb:block%mesh%half_lon_ub, &
                                  block%mesh%full_lat_lb:block%mesh%full_lat_ub, &
                                  block%mesh%full_lev_lb:block%mesh%full_lev_ub)
 
@@ -88,7 +89,7 @@ contains
     do k = mesh%full_lev_ibeg, mesh%full_lev_iend
       do j = mesh%full_lat_ibeg_no_pole, mesh%full_lat_iend_no_pole
         if (zonal_damp_on_full_lat(j)) then
-          call zonal_damp_1d(block, order, dt, mesh%half_lon_lb, mesh%half_lon_ub, mesh%lon_halo_width, f(:,j,k))
+          call zonal_damp_1d(block, order, dt, mesh%half_lon_lb, mesh%half_lon_ub, mesh%lon_halo_width, f(:,:,j,k))
         end if
       end do
     end do
@@ -100,7 +101,8 @@ contains
     type(block_type), intent(in), target :: block
     integer, intent(in) :: order
     real(8), intent(in) :: dt
-    real(r8), intent(inout) :: f(block%mesh%full_lon_lb:block%mesh%full_lon_ub, &
+    real(r8), intent(inout) :: f(member_num ,                                   &
+                                 block%mesh%full_lon_lb:block%mesh%full_lon_ub, &
                                  block%mesh%half_lat_lb:block%mesh%half_lat_ub, &
                                  block%mesh%full_lev_lb:block%mesh%full_lev_ub)
 
@@ -111,7 +113,7 @@ contains
     do k = mesh%full_lev_ibeg, mesh%full_lev_iend
       do j = mesh%half_lat_ibeg_no_pole, mesh%half_lat_iend_no_pole
         if (zonal_damp_on_half_lat(j)) then
-          call zonal_damp_1d(block, order, dt, mesh%full_lon_lb, mesh%full_lon_ub, mesh%lon_halo_width, f(:,j,k))
+          call zonal_damp_1d(block, order, dt, mesh%full_lon_lb, mesh%full_lon_ub, mesh%lon_halo_width, f(:,:,j,k))
         end if
       end do
     end do
@@ -123,7 +125,8 @@ contains
     type(block_type), intent(in), target :: block
     integer, intent(in) :: order
     real(8), intent(in) :: dt
-    real(r8), intent(inout) :: f(block%mesh%full_lon_lb:block%mesh%full_lon_ub, &
+    real(r8), intent(inout) :: f(member_num ,                                   &
+                                 block%mesh%full_lon_lb:block%mesh%full_lon_ub, &
                                  block%mesh%full_lat_lb:block%mesh%full_lat_ub, &
                                  block%mesh%full_lev_lb:block%mesh%full_lev_ub)
 
@@ -134,7 +137,7 @@ contains
     do k = mesh%full_lev_ibeg, mesh%full_lev_iend
       do j = mesh%full_lat_ibeg_no_pole, mesh%full_lat_iend_no_pole
         if (zonal_damp_on_full_lat(j)) then
-          call zonal_damp_1d(block, order, dt, mesh%full_lon_lb, mesh%full_lon_ub, mesh%lon_halo_width, f(:,j,k))
+          call zonal_damp_1d(block, order, dt, mesh%full_lon_lb, mesh%full_lon_ub, mesh%lon_halo_width, f(:,:,j,k))
         end if
       end do
     end do
@@ -146,7 +149,8 @@ contains
     type(block_type), intent(in), target :: block
     integer, intent(in) :: order
     real(8), intent(in) :: dt
-    real(r8), intent(inout) :: f(block%mesh%half_lon_lb:block%mesh%half_lon_ub, &
+    real(r8), intent(inout) :: f(member_num ,                                   &
+                                 block%mesh%half_lon_lb:block%mesh%half_lon_ub, &
                                  block%mesh%half_lat_lb:block%mesh%half_lat_ub, &
                                  block%mesh%full_lev_lb:block%mesh%full_lev_ub)
 
@@ -157,7 +161,7 @@ contains
     do k = mesh%full_lev_ibeg, mesh%full_lev_iend
       do j = mesh%half_lat_ibeg_no_pole, mesh%half_lat_iend_no_pole
         if (zonal_damp_on_half_lat(j)) then
-          call zonal_damp_1d(block, order, dt, mesh%half_lon_lb, mesh%half_lon_ub, mesh%lon_halo_width, f(:,j,k))
+          call zonal_damp_1d(block, order, dt, mesh%half_lon_lb, mesh%half_lon_ub, mesh%lon_halo_width, f(:,:,j,k))
         end if
       end do
     end do
@@ -172,10 +176,10 @@ contains
     integer, intent(in) :: lb
     integer, intent(in) :: ub
     integer, intent(in) :: hw
-    real(r8), intent(inout) :: f(lb:ub)
+    real(r8), intent(inout) :: f(member_num,lb:ub)
 
-    integer i, is, ie, ns
-    real(r8) c, g(lb:ub)
+    integer i, is, ie, ns, im
+    real(r8) c, g(member_num, lb:ub)
     real(r8), pointer :: w(:)
 
     c = 0.5_r8**order / dt
@@ -186,22 +190,26 @@ contains
       w => diff_weights(:,order-1)
       ! Calculate damping flux at interfaces.
       do i = is, ie + 1
-        g(i) = sum(f(i-ns:i+ns-1) * w(:2*ns))
+        do im = 1 , member_num
+          g(im ,i) = sum(f(im ,i-ns:i+ns-1) * w(:2*ns))
+        end do
       end do
       ! Limit damping flux to avoid upgradient (Xue 2000).
       g = g * (-1)**(order / 2)
       do i = is, ie + 1
-        g(i) = g(i) * max(0.0_r8, sign(1.0_r8, -g(i) * (f(i) - f(i-1))))
+        do im = 1 , member_num
+          g(im,i) = g(im,i) * max(0.0_r8, sign(1.0_r8, -g(im,i) * (f(im,i) - f(im,i-1))))
+        end do
       end do
       do i = is, ie
-        f(i) = f(i) - c * dt * (g(i+1) - g(i))
+        f(:,i) = f(:,i) - c * dt * (g(:,i+1) - g(:,i))
       end do
     else
       do i = is, ie
-        f(i) = f(i) + c * dt * (f(i-1) - 2.0_r8 * f(i) + f(i+1))
+        f(:,i) = f(:,i) + c * dt * (f(:,i-1) - 2.0_r8 * f(:,i) + f(:,i+1))
       end do
     end if
-    call fill_zonal_halo(block, hw, f)
+    call fill_zonal_halo_member(block, hw, f)
 
   end subroutine zonal_damp_1d
 

@@ -20,7 +20,7 @@ contains
 
     type(static_type), intent(in) :: static
 
-    integer i, j, k
+    integer i, j, k, im
 
     select case (refer_state_scheme)
     case ('wrf')
@@ -32,8 +32,10 @@ contains
     do k = refer_state%mesh%full_lev_ibeg, refer_state%mesh%full_lev_iend
       do j = refer_state%mesh%full_lat_ibeg, refer_state%mesh%full_lat_iend
         do i = refer_state%mesh%full_lon_ibeg, refer_state%mesh%full_lon_iend
-          refer_state%pt(i,j,k) = potential_temperature(refer_state%t(i,j,k), refer_state%ph(i,j,k))
-          refer_state%rhod(i,j,k) = dry_air_density(refer_state%pt(i,j,k), refer_state%ph(i,j,k))
+          do im = 1 , member_num
+            refer_state%pt(im,i,j,k) = potential_temperature(refer_state%t(im,i,j,k), refer_state%ph(im,i,j,k))
+            refer_state%rhod(im,i,j,k) = dry_air_density(refer_state%pt(im,i,j,k), refer_state%ph(im,i,j,k))
+          end do
         end do
       end do
     end do

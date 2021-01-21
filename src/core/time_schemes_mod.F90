@@ -82,7 +82,7 @@ contains
       if (tend%updated_dphs) then
         do j = mesh%full_lat_ibeg, mesh%full_lat_iend
           do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-            new_state%phs(i,j) = old_state%phs(i,j) + dt * tend%dphs(i,j)
+            new_state%phs(:,i,j) = old_state%phs(:,i,j) + dt * tend%dphs(:,i,j)
           end do
         end do
 
@@ -93,7 +93,7 @@ contains
   call Get_Start_Time(tran_time_start)
 #endif
 
-        call fill_halo(block, new_state%phs, full_lon=.true., full_lat=.true.)
+        call fill_halo_member(block, new_state%phs, full_lon=.true., full_lat=.true.)
 
 #ifdef Detail_Time
   call Get_End_Time(tran_time_end)
@@ -114,7 +114,7 @@ contains
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
           do j = mesh%full_lat_ibeg, mesh%full_lat_iend
             do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-              new_state%pt(i,j,k) = (old_state%pt(i,j,k) * old_state%m(i,j,k) + dt * tend%dpt(i,j,k)) / new_state%m(i,j,k)
+              new_state%pt(:,i,j,k) = (old_state%pt(:,i,j,k) * old_state%m(:,i,j,k) + dt * tend%dpt(:,i,j,k)) / new_state%m(:,i,j,k)
             end do
           end do
         end do
@@ -126,7 +126,7 @@ contains
   call Get_Start_Time(tran_time_start)
 #endif
 
-        call fill_halo(block, new_state%pt, full_lon=.true., full_lat=.true., full_lev=.true.)
+        call fill_halo_member(block, new_state%pt, full_lon=.true., full_lat=.true., full_lev=.true.)
 
 #ifdef Detail_Time
   call Get_End_Time(tran_time_end)
@@ -141,7 +141,7 @@ contains
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
           do j = mesh%full_lat_ibeg, mesh%full_lat_iend
             do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-              new_state%gz(i,j,k) = old_state%gz(i,j,k) + dt * tend%dgz(i,j,k)
+              new_state%gz(:,i,j,k) = old_state%gz(:,i,j,k) + dt * tend%dgz(:,i,j,k)
             end do
           end do
         end do
@@ -153,7 +153,7 @@ contains
   call Get_Start_Time(tran_time_start)
 #endif
 
-        call fill_halo(block, new_state%gz, full_lon=.true., full_lat=.true.)
+        call fill_halo_member(block, new_state%gz, full_lon=.true., full_lat=.true.)
 
 #ifdef Detail_Time
   call Get_End_Time(tran_time_end)
@@ -169,7 +169,7 @@ contains
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
         do j = mesh%full_lat_ibeg_no_pole, mesh%full_lat_iend_no_pole
           do i = mesh%half_lon_ibeg, mesh%half_lon_iend
-            new_state%u(i,j,k) = old_state%u(i,j,k) + dt * tend%du(i,j,k)
+            new_state%u(:,i,j,k) = old_state%u(:,i,j,k) + dt * tend%du(:,i,j,k)
           end do
         end do
       end do
@@ -179,7 +179,7 @@ contains
   call Get_End_Time(wait_time_end)
   call Get_Start_Time(tran_time_start)
 #endif
-      call fill_halo(block, new_state%u, full_lon=.false., full_lat=.true., full_lev=.true.)
+      call fill_halo_member(block, new_state%u, full_lon=.false., full_lat=.true., full_lev=.true.)
 #ifdef Detail_Time
   call Get_End_Time(tran_time_end)
   write((20000+myid),*) , 4 , tran_time_end - tran_time_start , wait_time_end - wait_time_start
@@ -190,7 +190,7 @@ contains
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
         do j = mesh%half_lat_ibeg_no_pole, mesh%half_lat_iend_no_pole
           do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-            new_state%v(i,j,k) = old_state%v(i,j,k) + dt * tend%dv(i,j,k)
+            new_state%v(:,i,j,k) = old_state%v(:,i,j,k) + dt * tend%dv(:,i,j,k)
           end do
         end do
       end do
@@ -200,7 +200,7 @@ contains
   call Get_End_Time(wait_time_end)
   call Get_Start_Time(tran_time_start)  
 #endif
-      call fill_halo(block, new_state%v, full_lon=.true., full_lat=.false., full_lev=.true.)
+      call fill_halo_member(block, new_state%v, full_lon=.true., full_lat=.false., full_lev=.true.)
 #ifdef Detail_Time
   call Get_End_Time(tran_time_end)
   write((20000+myid),*) , 5 , tran_time_end - tran_time_start , wait_time_end - wait_time_start
