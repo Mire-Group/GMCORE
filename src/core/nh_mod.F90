@@ -18,11 +18,12 @@ module nh_mod
   public nh_solve
 
 contains
-  ! 负责隐式求解w和gz，包括需要预计算的准备项
-  subroutine nh_solve(block, tend, old_state, new_state, dt)
+
+  subroutine nh_solve(block, tend, last_state, old_state, new_state, dt)
 
     type(block_type), intent(inout) :: block
     type(tend_type ), intent(inout) :: tend
+    type(state_type), intent(in) :: last_state
     type(state_type), intent(inout) :: old_state
     type(state_type), intent(inout) :: new_state
     real(8), intent(in) :: dt
@@ -45,7 +46,7 @@ contains
 
     call calc_adv_gz          (block, old_state, tend)
     call calc_adv_w           (block, old_state, tend)
-    call implicit_w_solver    (block, tend, old_state, new_state, dt)
+    call implicit_w_solver    (block, tend, last_state, old_state, new_state, dt)
 
     call diag_rhod            (block, new_state)
     call diag_p               (block, new_state)
@@ -218,38 +219,36 @@ contains
           end do
         end do
       end do
-      ! 极点处只处理经向对流，极点的u一直是0（极点只有一个u，w和gz，但有多个v，像一个圆形的网格）
-      #ifndef V_POLE
-        if (mesh%has_south_pole()) then
-          j = mesh%full_lat_ibeg
-          pole = 0.0_r8 ! 数组整体赋值 real(r8) pole(state%mesh%num_full_lev) TODO pole要改成num_half_lev的大小
-          do k = mesh%full_lev_ibeg, mesh%full_lev_iend ! TODO k用half
-            do i = mesh%full_lon_ibeg, mesh%full_lon_iend ! 极点周围一圈求和
-              pole(k) = pole(k) + mf_lev_lat_n(i,j,k) * (gz_lev_lat(i,j,k) - gz_lev(i,j,k))
-            end do
+#ifndef V_POLE
+      if (mesh%has_south_pole()) then
+        j = mesh%full_lat_ibeg
+        pole = 0.0_r8
+        do k = mesh%half_lev_ibeg, mesh%half_lev_iend
+          do i = mesh%full_lon_ibeg, mesh%full_lon_iend
+            pole(k) = pole(k) + mf_lev_lat_n(i,j,k) * (gz_lev_lat(i,j,k) - gz_lev(i,j,k))
           end do
-          call zonal_sum(proc%zonal_comm, pole)
-          pole = pole * mesh%le_lat(j) / global_mesh%num_full_lon / mesh%area_cell(j)
-          do k = mesh%full_lev_ibeg, mesh%full_lev_iend ! TODO k用half
-            do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-              adv_gz_lat(i,j,k) = pole(k) / m_lev(i,j,k) / global_mesh%num_full_lon ! m_lev代表的是一个小扇形的质量，把它们乘起来
-            end do
+        end do
+        call zonal_sum(proc%zonal_comm, pole)
+        pole = pole * mesh%le_lat(j) / global_mesh%num_full_lon / mesh%area_cell(j)
+        do k = mesh%half_lev_ibeg, mesh%half_lev_iend
+          do i = mesh%full_lon_ibeg, mesh%full_lon_iend
+            adv_gz_lat(i,j,k) = pole(k) / m_lev(i,j,k) / global_mesh%num_full_lon
           end do
-        end if
-        if (mesh%has_north_pole()) then
-          j = mesh%full_lat_iend
-          pole = 0.0_r8
-          do k = mesh%full_lev_ibeg, mesh%full_lev_iend ! TODO k用half
-            do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-              pole(k) = pole(k) - mf_lev_lat_n(i,j-1,k) * (gz_lev_lat(i,j-1,k) - gz_lev(i,j,k))
-            end do
+        end do
+      end if
+      if (mesh%has_north_pole()) then
+        j = mesh%full_lat_iend
+        pole = 0.0_r8
+        do k = mesh%half_lev_ibeg, mesh%half_lev_iend
+          do i = mesh%full_lon_ibeg, mesh%full_lon_iend
+            pole(k) = pole(k) - mf_lev_lat_n(i,j-1,k) * (gz_lev_lat(i,j-1,k) - gz_lev(i,j,k))
           end do
-          call zonal_sum(proc%zonal_comm, pole)
-          pole = pole * mesh%le_lat(j-1) / global_mesh%num_full_lon / mesh%area_cell(j)
-          do k = mesh%full_lev_ibeg, mesh%full_lev_iend ! TODO k用half
-            do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-              adv_gz_lat(i,j,k) = pole(k) / m_lev(i,j,k) / global_mesh%num_full_lon
-            end do
+        end do
+        call zonal_sum(proc%zonal_comm, pole)
+        pole = pole * mesh%le_lat(j-1) / global_mesh%num_full_lon / mesh%area_cell(j)
+        do k = mesh%half_lev_ibeg, mesh%half_lev_iend
+          do i = mesh%full_lon_ibeg, mesh%full_lon_iend
+            adv_gz_lat(i,j,k) = pole(k) / m_lev(i,j,k) / global_mesh%num_full_lon
           end do
         end if
       #endif
@@ -270,17 +269,22 @@ contains
       k = mesh%half_lev_ibeg  ! top
       do j = mesh%full_lat_ibeg, mesh%full_lat_iend
         do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-          adv_gz_lev(i,j,k) = state%wedphdlev(i,j,k) * (state%gz(i,j,k) - gz_lev(i,j,k)) / m_lev(i,j,k)
+          adv_gz_lev(i,j,k) = wedphdlev(i,j,k) * (gz(i,j,k) - gz_lev(i,j,k)) / m_lev(i,j,k)
         end do
       end do
       ! Bottom gz is static topography, so no tendency for it (i.e., gzs).
-      #ifndef V_POLE
-        if (mesh%has_south_pole()) then
-          j = mesh%full_lat_ibeg
-          do k = mesh%full_lev_ibeg, mesh%full_lev_iend ! TODO k用half
-            do i = mesh%full_lon_ibeg, mesh%full_lon_iend ! 极点处的垂直对流要除以纬向网格数
-              adv_gz_lev(i,j,k) = adv_gz_lev(i,j,k) / global_mesh%num_full_lon
-            end do
+      k = mesh%half_lev_iend
+      do j = mesh%full_lat_ibeg, mesh%full_lat_iend
+        do i = mesh%full_lon_ibeg, mesh%full_lon_iend
+          adv_gz_lev(i,j,k) = wedphdlev(i,j,k-1) * (gz_lev(i,j,k) - gz(i,j,k-1)) / m_lev(i,j,k)
+        end do
+      end do
+#ifndef V_POLE
+      if (mesh%has_south_pole()) then
+        j = mesh%full_lat_ibeg
+        do k = mesh%full_lev_ibeg, mesh%full_lev_iend
+          do i = mesh%full_lon_ibeg, mesh%full_lon_iend
+            adv_gz_lev(i,j,k) = adv_gz_lev(i,j,k) / global_mesh%num_full_lon
           end do
         end if
         if (mesh%has_north_pole()) then
@@ -372,37 +376,36 @@ contains
           end do
         end do
       end do
-      #ifndef V_POLE
-        if (mesh%has_south_pole()) then
-          j = mesh%full_lat_ibeg
-          pole = 0.0_r8
-          do k = mesh%full_lev_ibeg + 1, mesh%full_lev_iend - 1 ! TODO k用half
-            do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-              pole(k) = pole(k) + mf_lev_lat_n(i,j,k) * (w_lev_lat(i,j,k) - w_lev(i,j,k))
-            end do
+#ifndef V_POLE
+      if (mesh%has_south_pole()) then
+        j = mesh%full_lat_ibeg
+        pole = 0.0_r8
+        do k = mesh%half_lev_ibeg + 1, mesh%half_lev_iend - 1
+          do i = mesh%full_lon_ibeg, mesh%full_lon_iend
+            pole(k) = pole(k) + mf_lev_lat_n(i,j,k) * (w_lev_lat(i,j,k) - w_lev(i,j,k))
           end do
-          call zonal_sum(proc%zonal_comm, pole)
-          pole = pole * mesh%le_lat(j) / global_mesh%num_full_lon / mesh%area_cell(j)
-          do k = mesh%full_lev_ibeg + 1, mesh%full_lev_iend - 1 ! TODO k用half
-            do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-              adv_w_lat(i,j,k) = pole(k) / m_lev(i,j,k) / global_mesh%num_full_lon
-            end do
+        end do
+        call zonal_sum(proc%zonal_comm, pole)
+        pole = pole * mesh%le_lat(j) / global_mesh%num_full_lon / mesh%area_cell(j)
+        do k = mesh%half_lev_ibeg + 1, mesh%half_lev_iend - 1
+          do i = mesh%full_lon_ibeg, mesh%full_lon_iend
+            adv_w_lat(i,j,k) = pole(k) / m_lev(i,j,k) / global_mesh%num_full_lon
           end do
-        end if
-        if (mesh%has_north_pole()) then
-          j = mesh%full_lat_iend
-          pole = 0.0_r8
-          do k = mesh%full_lev_ibeg + 1, mesh%full_lev_iend - 1 ! TODO k用half
-            do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-              pole(k) = pole(k) - mf_lev_lat_n(i,j-1,k) * (w_lev_lat(i,j-1,k) - w_lev(i,j,k))
-            end do
+        end do
+      end if
+      if (mesh%has_north_pole()) then
+        j = mesh%full_lat_iend
+        pole = 0.0_r8
+        do k = mesh%half_lev_ibeg + 1, mesh%half_lev_iend - 1
+          do i = mesh%full_lon_ibeg, mesh%full_lon_iend
+            pole(k) = pole(k) - mf_lev_lat_n(i,j-1,k) * (w_lev_lat(i,j-1,k) - w_lev(i,j,k))
           end do
-          call zonal_sum(proc%zonal_comm, pole)
-          pole = pole * mesh%le_lat(j-1) / global_mesh%num_full_lon / mesh%area_cell(j)
-          do k = mesh%full_lev_ibeg + 1, mesh%full_lev_iend - 1 ! TODO k用half
-            do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-              adv_w_lat(i,j,k) = pole(k) / m_lev(i,j,k) / global_mesh%num_full_lon
-            end do
+        end do
+        call zonal_sum(proc%zonal_comm, pole)
+        pole = pole * mesh%le_lat(j-1) / global_mesh%num_full_lon / mesh%area_cell(j)
+        do k = mesh%half_lev_ibeg + 1, mesh%half_lev_iend - 1
+          do i = mesh%full_lon_ibeg, mesh%full_lon_iend
+            adv_w_lat(i,j,k) = pole(k) / m_lev(i,j,k) / global_mesh%num_full_lon
           end do
         end if
       #endif
@@ -422,21 +425,20 @@ contains
       end do
       ! Top w is fixed to be zero.
       ! Bottom w is from boundary condition, so no tendency for it.
-      #ifndef V_POLE
-        if (mesh%has_south_pole()) then
-          j = mesh%full_lat_ibeg
-          do k = mesh%full_lev_ibeg, mesh%full_lev_iend ! TODO k用half
-            do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-              adv_w_lev(i,j,k) = adv_w_lev(i,j,k) / global_mesh%num_full_lon
-            end do
+#ifndef V_POLE
+      if (mesh%has_south_pole()) then
+        j = mesh%full_lat_ibeg
+        do k = mesh%half_lev_ibeg, mesh%half_lev_iend
+          do i = mesh%full_lon_ibeg, mesh%full_lon_iend
+            adv_w_lev(i,j,k) = adv_w_lev(i,j,k) / global_mesh%num_full_lon
           end do
-        end if
-        if (mesh%has_north_pole()) then
-          j = mesh%full_lat_iend
-          do k = mesh%full_lev_ibeg, mesh%full_lev_iend ! TODO k用half
-            do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-              adv_w_lev(i,j,k) = adv_w_lev(i,j,k) / global_mesh%num_full_lon
-            end do
+        end do
+      end if
+      if (mesh%has_north_pole()) then
+        j = mesh%full_lat_iend
+        do k = mesh%half_lev_ibeg, mesh%half_lev_iend
+          do i = mesh%full_lon_ibeg, mesh%full_lon_iend
+            adv_w_lev(i,j,k) = adv_w_lev(i,j,k) / global_mesh%num_full_lon
           end do
         end if
       #endif
@@ -524,15 +526,13 @@ contains
 
     integer i, j, k
 
-    associate (mesh       => block%mesh  , &
-               old_p      => old_state%p , &
-               new_p      => new_state%p , &
+    associate (mesh       => block%mesh      , &
+               old_p      => old_state%p     , &
+               new_p      => new_state%p     , &
                old_gz_lev => old_state%gz_lev, &
                new_gz_lev => new_state%gz_lev, &
-               old_pt     => old_state%pt, &
-               new_pt     => new_state%pt, &
-               old_m      => old_state%m , &
-               new_m      => new_state%m)
+               old_pt     => old_state%pt    , &
+               new_pt     => new_state%pt)
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
         do j = mesh%full_lat_ibeg, mesh%full_lat_iend
           do i = mesh%full_lon_ibeg, mesh%full_lon_iend
@@ -586,10 +586,11 @@ contains
 
   end subroutine apply_bc_w_lev
 
-  subroutine implicit_w_solver(block, tend, old_state, new_state, dt) ! 应该不只有两个state，old=curr, new=next_sub，那last_sub呢？
+  subroutine implicit_w_solver(block, tend, last_state, old_state, new_state, dt)
 
     type(block_type), intent(in) :: block
     type(tend_type), intent(in) :: tend
+    type(state_type), intent(in) :: last_state
     type(state_type), intent(in) :: old_state
     type(state_type), intent(inout) :: new_state
     real(8), intent(in) :: dt
@@ -608,10 +609,10 @@ contains
     call apply_bc_w_lev(block, new_state)
 
     !
-    ! ϕ¹ = ϕⁿ - Δt adv_ϕⁿ + g Δt (1 - β) wⁿ
+    ! ϕ¹ = ϕⁿ - Δt adv_ϕ* + g Δt (1 - β) w*
     !
     !                                                   
-    ! w¹ = wⁿ - Δt adv_wⁿ - g Δt + g Δt (1 - β) (∂p/∂π)ⁿ
+    ! w¹ = wⁿ - Δt adv_w* - g Δt + g Δt (1 - β) (∂p/∂π)*
     !                                                   
     ! Linearized state of ideal gas
     !
@@ -619,20 +620,30 @@ contains
     !         -----------------------------------------------------
     !                                dp1
     !
-    associate (mesh       => block%mesh,       &
-               beta       => implicit_w_beta,  &
-               old_p      => old_state%p,      &
-               old_p_lev  => old_state%p_lev,  &
-               old_w_lev  => old_state%w_lev,  &
-               new_w_lev  => new_state%w_lev,  &
-               old_m_lev  => old_state%m_lev,  &
-               new_m_lev  => new_state%m_lev,  &
-               old_gz_lev => old_state%gz_lev, &
-               new_gz_lev => new_state%gz_lev, &
-               old_m      => old_state%m,      &
-               new_m      => new_state%m,      &
-               old_pt     => old_state%pt,     &
-               new_pt     => new_state%pt)
+    associate (mesh        => block%mesh       , &
+               beta        => implicit_w_beta  , &
+               adv_gz_lon  => tend%adv_gz_lon  , & ! FIXME: After test success, merge advection tends togethor.
+               adv_gz_lat  => tend%adv_gz_lat  , & !
+               adv_gz_lev  => tend%adv_gz_lev  , & !
+               adv_w_lon   => tend%adv_w_lon   , & !
+               adv_w_lat   => tend%adv_w_lat   , & !
+               adv_w_lev   => tend%adv_w_lev   , & !
+               last_p      => last_state%p     , &
+               old_p       => old_state%p      , &
+               old_p_lev   => old_state%p_lev  , &
+               last_w_lev  => last_state%w_lev , &
+               old_w_lev   => old_state%w_lev  , &
+               new_w_lev   => new_state%w_lev  , &
+               old_m_lev   => old_state%m_lev  , &
+               new_m_lev   => new_state%m_lev  , &
+               last_gz_lev => last_state%gz_lev, &
+               old_gz_lev  => old_state%gz_lev , &
+               new_gz_lev  => new_state%gz_lev , &
+               last_m      => last_state%m     , &
+               new_m       => new_state%m      , &
+               last_pt     => last_state%pt    , &
+               new_pt      => new_state%pt)
+      ! last: n, old: *, new: n + 1
       gdtbeta     = g * dt * beta
       gdt1mbeta   = g * dt * (1 - beta)
       gdtbeta2gam = (g * dt * beta)**2 * cp_o_cv
@@ -640,10 +651,10 @@ contains
       do j = mesh%full_lat_ibeg, mesh%full_lat_iend
         do i = mesh%full_lon_ibeg, mesh%full_lon_iend
           do k = mesh%full_lev_ibeg, mesh%full_lev_iend
-            dgz(k) = old_gz_lev(i,j,k+1) - old_gz_lev(i,j,k)
+            dgz(k) = last_gz_lev(i,j,k+1) - last_gz_lev(i,j,k)
           end do
-          gz1 = old_gz_lev(i,j,:) - dt * (tend%adv_gz_lon(i,j,:) + tend%adv_gz_lat(i,j,:) + tend%adv_gz_lev(i,j,:)) + gdt1mbeta * old_w_lev(i,j,:)
-          w1  = old_w_lev (i,j,:) - dt * (tend%adv_w_lon (i,j,:) + tend%adv_w_lat (i,j,:) + tend%adv_w_lev (i,j,:))- g * dt
+          gz1 = last_gz_lev(i,j,:) - dt * (adv_gz_lon(i,j,:) + adv_gz_lat(i,j,:) + adv_gz_lev(i,j,:)) + gdt1mbeta * old_w_lev(i,j,:)
+          w1  = last_w_lev (i,j,:) - dt * (adv_w_lon (i,j,:) + adv_w_lat (i,j,:) + adv_w_lev (i,j,:)) - g * dt
           do k = mesh%half_lev_ibeg + 1, mesh%half_lev_iend - 1
             w1(k) = w1(k) + gdt1mbeta * (old_p(i,j,k) - old_p(i,j,k-1)) / old_m_lev(i,j,k)
           end do
@@ -656,14 +667,13 @@ contains
 
           ! Use linearized state of ideal gas to calculate the first part of ∂pⁿ⁺¹ (i.e. dp1).
           do k = mesh%half_lev_ibeg + 1, mesh%half_lev_iend - 1
-            dp1 = (old_p(i,j,k) - old_p(i,j,k-1)) &
-            + cp_o_cv * ( (                                                                          &
-              old_p(i,j,k  ) * new_m(i,j,k  ) * new_pt(i,j,k  ) / old_m(i,j,k  ) / old_pt(i,j,k  ) - &
-              old_p(i,j,k-1) * new_m(i,j,k-1) * new_pt(i,j,k-1) / old_m(i,j,k-1) / old_pt(i,j,k-1)   &
-            ) - (                                                                                    &
-              old_p(i,j,k  ) * (gz1(k+1) - gz1(k  )) / dgz(k  ) -                                    &
-              old_p(i,j,k-1) * (gz1(k  ) - gz1(k-1)) / dgz(k-1)                                      &
-            ) )
+            dp1 = (last_p(i,j,k) - last_p(i,j,k-1)) + cp_o_cv * ((                                      &
+              last_p(i,j,k  ) * new_m(i,j,k  ) * new_pt(i,j,k  ) / last_m(i,j,k  ) / last_pt(i,j,k  ) - &
+              last_p(i,j,k-1) * new_m(i,j,k-1) * new_pt(i,j,k-1) / last_m(i,j,k-1) / last_pt(i,j,k-1)   &
+            ) - (                                                                                       &
+              last_p(i,j,k  ) * (gz1(k+1) - gz1(k  )) / dgz(k  ) -                                      &
+              last_p(i,j,k-1) * (gz1(k  ) - gz1(k-1)) / dgz(k-1)                                        &
+            ))
             w1(k) = w1(k) + gdtbeta * dp1 / new_m_lev(i,j,k)
           end do
           ! Set coefficients for implicit solver.
@@ -672,9 +682,9 @@ contains
           c(1) = 0.0_r8
           d(1) = 0.0_r8 ! Top w is set to zero.
           do k = mesh%half_lev_ibeg + 1, mesh%half_lev_iend - 1
-            a(k) = gdtbeta2gam * old_p(i,j,k-1) / dgz(k-1)
-            b(k) = new_m_lev(i,j,k) - gdtbeta2gam * (old_p(i,j,k) / dgz(k) + old_p(i,j,k-1) / dgz(k-1))
-            c(k) = gdtbeta2gam * old_p(i,j,k  ) / dgz(k  )
+            a(k) = gdtbeta2gam * last_p(i,j,k-1) / dgz(k-1)
+            b(k) = new_m_lev(i,j,k) - gdtbeta2gam * (last_p(i,j,k) / dgz(k) + last_p(i,j,k-1) / dgz(k-1))
+            c(k) = gdtbeta2gam * last_p(i,j,k  ) / dgz(k  )
             d(k) = new_m_lev(i,j,k) * w1(k)
           end do
           a(mesh%num_half_lev) = 0.0_r8
@@ -682,6 +692,8 @@ contains
           c(mesh%num_half_lev) = 0.0_r8
           d(mesh%num_half_lev) = new_w_lev(i,j,mesh%num_half_lev)
           call tridiag_thomas(a, b, c, d, new_w_lev(i,j,:))
+
+          call rayleigh_damp_w(dt, old_gz_lev(i,j,:), new_w_lev(i,j,:))
 
           ! Update gz after w is solved.
           do k = mesh%half_lev_ibeg, mesh%half_lev_iend - 1
@@ -691,10 +703,28 @@ contains
       end do
       call fill_halo(block, new_w_lev , full_lon=.true., full_lat=.true., full_lev=.false.)
       call fill_halo(block, new_gz_lev, full_lon=.true., full_lat=.true., full_lev=.false.)
-
-      call rayleigh_damp_w(block, dt, new_state)
     end associate
 
   end subroutine implicit_w_solver
+
+  subroutine rayleigh_damp_w(dt, gz, w)
+
+    real(8) , intent(in   ) :: dt
+    real(r8), intent(in   ) :: gz(:)
+    real(r8), intent(inout) :: w (:)
+
+    real(r8), parameter :: rayleigh_damp_w_coef = 0.2_r8
+    real(r8), parameter :: gzd = 10.0e3_r8
+    real(r8) c
+    integer k
+
+    do k = 2, size(w) - 1
+      if (gz(k) >= gz(1) - gzd) then
+        c = rayleigh_damp_w_coef * sin(pi05 * (1 - (gz(1) - gz(k)) / gzd))**2
+        w(k) = w(k) / (1 + c * dt)
+      end if
+    end do
+
+  end subroutine rayleigh_damp_w
 
 end module nh_mod

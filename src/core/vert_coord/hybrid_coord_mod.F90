@@ -109,7 +109,7 @@ contains
     integer, intent(in) :: k
     real(r8), intent(in) :: phs
 
-    res = hyai(k) * p0 + hybm(k) * phs  ! 通过垂直坐标和phs算整层ph的应该用hyam？
+    res = hyam(k) * p0 + hybm(k) * phs
 
   end function hybrid_coord_calc_ph
 

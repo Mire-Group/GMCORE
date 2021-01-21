@@ -60,7 +60,7 @@ contains
       call interp_m_vtx               (blocks(iblk), blocks(iblk)%state(itime))
       call calc_mf                    (blocks(iblk), blocks(iblk)%state(itime))
       call calc_ke                    (blocks(iblk), blocks(iblk)%state(itime))
-      call diag_pv                    (blocks(iblk), blocks(iblk)%state(itime))
+      call diag_pv                    (blocks(iblk), blocks(iblk)%state(itime), dt)
       call interp_pv                  (blocks(iblk), blocks(iblk)%state(itime), dt)
       call calc_div                   (blocks(iblk), blocks(iblk)%state(itime))
       if (hydrostatic) then
@@ -81,7 +81,7 @@ contains
     integer, intent(in) :: pass
 
     if (pass == vor_damp_pass) then
-      call calc_vor                   (block, state)
+      call calc_vor                   (block, state, dt)
     else if (pass == div_damp_pass) then
       call calc_div                   (block, state)
     else
@@ -95,8 +95,8 @@ contains
         call calc_mf                  (block, state)  ! 从m_lon和m_lat计算水平边上的质量通量
         call calc_ke                  (block, state)
         if (pass == all_pass .or. pass == slow_pass) then
-          call interp_m_vtx           (block, state)  ! 将m从网格中心（整层）插值到整层的网格顶点
-          call diag_pv                (block, state)  ! 
+          call interp_m_vtx           (block, state)
+          call diag_pv                (block, state, dt)
           call interp_pv              (block, state, dt)
           call calc_div               (block, state)
         end if
@@ -529,59 +529,22 @@ contains
 
     mesh => state%mesh
 
-    call interp_pv(block, state, dt)
-
-    #ifdef V_POLE
-      do k = mesh%full_lev_ibeg, mesh%full_lev_iend
-        do j = mesh%half_lat_ibeg_no_pole, mesh%half_lat_iend_no_pole
-          if (block%reduced_mesh(j-1)%reduce_factor > 1) then
-            tend%qhu(:,j,k) = 0.0_r8
-            do move = 1, block%reduced_mesh(j-1)%reduce_factor
-              do i = block%reduced_mesh(j-1)%full_lon_ibeg, block%reduced_mesh(j-1)%full_lon_iend
-                block%reduced_tend(j-1)%qhu(i,k) = (                    &
-                  block%reduced_mesh(j-1)%half_tangent_wgt(1,1) * (     &
-                    block%reduced_state(j-1)%mf_lon_n(k,i-1,0,move) * ( &
-                      block%reduced_state(j-1)%pv_lat(k,i  ,1,move) +   &
-                      block%reduced_state(j-1)%pv_lon(k,i-1,0,move)     &
-                    ) +                                                 &
-                    block%reduced_state(j-1)%mf_lon_n(k,i  ,0,move) * ( &
-                      block%reduced_state(j-1)%pv_lat(k,i  ,1,move) +   &
-                      block%reduced_state(j-1)%pv_lon(k,i  ,0,move)     &
-                    )                                                   &
-                  )                                                     &
-                ) * 0.5_r8
-              end do
-              call reduce_append_array(move, block%reduced_mesh(j-1), block%reduced_tend(j-1)%qhu(:,k), mesh, tend%qhu(:,j,k))
-            end do
-            call overlay_inner_halo(block, tend%qhu(:,j,k), west_halo=.true.)
-          else
-            do i = mesh%full_lon_ibeg, mesh%full_lon_iend
-              if (coriolis_scheme == 1) then
-                tend%qhu(i,j,k) = (                                                               &
-                  mesh%half_tangent_wgt(1,j) * (                                                  &
-                    state%mf_lon_n(i-1,j-1,k) * (state%pv_lat(i,j,k) + state%pv_lon(i-1,j-1,k)) + &
-                    state%mf_lon_n(i  ,j-1,k) * (state%pv_lat(i,j,k) + state%pv_lon(i  ,j-1,k))   &
-                  )                                                                               &
-                ) * 0.5_r8
-              else if (coriolis_scheme == 2) then
-                tend%qhu(i,j,k) = state%mf_lat_t(i,j,k) * state%pv_lat(i,j,k)
-              end if
-            end do
-          end if
-          if (block%reduced_mesh(j)%reduce_factor > 1) then
-            call zero_halo(block, tend%qhu(:,j,k), east_halo=.true.)
-            do move = 1, block%reduced_mesh(j)%reduce_factor
-              do i = block%reduced_mesh(j)%full_lon_ibeg, block%reduced_mesh(j)%full_lon_iend
-                block%reduced_tend(j)%qhu(i,k) = (                    &
-                  block%reduced_mesh(j)%half_tangent_wgt(2,0) * (     &
-                    block%reduced_state(j)%mf_lon_n(k,i-1,0,move) * ( &
-                      block%reduced_state(j)%pv_lat(k,i  ,0,move) +   &
-                      block%reduced_state(j)%pv_lon(k,i-1,0,move)     &
-                    ) +                                               &
-                    block%reduced_state(j)%mf_lon_n(k,i  ,0,move) * ( &
-                      block%reduced_state(j)%pv_lat(k,i  ,0,move) +   &
-                      block%reduced_state(j)%pv_lon(k,i  ,0,move)     &
-                    )                                                 &
+#ifdef V_POLE
+    do k = mesh%full_lev_ibeg, mesh%full_lev_iend
+      do j = mesh%half_lat_ibeg_no_pole, mesh%half_lat_iend_no_pole
+        if (block%reduced_mesh(j-1)%reduce_factor > 1) then
+          tend%qhu(:,j,k) = 0.0_r8
+          do move = 1, block%reduced_mesh(j-1)%reduce_factor
+            do i = block%reduced_mesh(j-1)%full_lon_ibeg, block%reduced_mesh(j-1)%full_lon_iend
+              block%reduced_tend(j-1)%qhu(i,k) = (                    &
+                block%reduced_mesh(j-1)%half_tangent_wgt(1,1) * (     &
+                  block%reduced_state(j-1)%mf_lon_n(k,i-1,0,move) * ( &
+                    block%reduced_state(j-1)%pv_lat(k,i  ,1,move) +   &
+                    block%reduced_state(j-1)%pv_lon(k,i-1,0,move)     &
+                  ) +                                                 &
+                  block%reduced_state(j-1)%mf_lon_n(k,i  ,0,move) * ( &
+                    block%reduced_state(j-1)%pv_lat(k,i  ,1,move) +   &
+                    block%reduced_state(j-1)%pv_lon(k,i  ,0,move)     &
                   )                                                   &
                 ) * 0.5_r8
               end do

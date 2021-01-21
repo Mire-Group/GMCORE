@@ -155,7 +155,7 @@ contains
         end do
       end if
       call history_write_state(proc%blocks, itime)
-      call history_write_debug(proc%blocks, itime)
+      if (output_debug) call history_write_debug(proc%blocks, itime)
     end if
     if (time_is_alerted('restart_write')) then
       call restart_write(itime)
@@ -264,10 +264,10 @@ contains
 
   end subroutine diagnose
 
-  ! 计算总倾向，即方程中除时间偏导外的其它项之和
-  subroutine space_operators(block, old_state, new_state, tend, dt, pass) 
-    ! 目前非静力，传参pass==all_pass
+  subroutine space_operators(block, last_state, old_state, new_state, tend, dt, pass)
+
     type(block_type), intent(inout) :: block
+    type(state_type), intent(in) :: last_state
     type(state_type), intent(inout) :: old_state
     type(state_type), intent(inout) :: new_state
     type(tend_type), intent(inout) :: tend
@@ -337,18 +337,16 @@ contains
 
         tend%update_phs = .true.
         tend%update_pt  = .true.
-        
-        ! 更新phs和pt
-        call update_state(block, tend, old_state, new_state, dt, no_wind_pass) ! 注意非静力此处第一次调用update_state，不更新state的风场！！！
-        ! 调用非静力隐式求解w和gz
-        call nh_solve(block, tend, old_state, new_state, dt)  ! 求解w和gz，内含密度和压力的诊断
-        ! 准备水平速度方程需要的各项
-        call calc_qhu_qhv          (block, old_state, tend, dt) ! 计算科氏力
-        call calc_dkedlon_dkedlat  (block, old_state, tend, dt) ! 计算水平动能的水平对流
-        call calc_wedudlev_wedvdlev(block, old_state, tend, dt) ! 计算η'*du/dη和η'*dv/dη
+        call update_state(block, tend, old_state, new_state, dt, no_wind_pass)
 
-        call pgf_run               (block, new_state, tend)     ! 计算水平气压梯度力
-        ! 再计算du和dv
+        call nh_solve(block, tend, last_state, old_state, new_state, dt)
+
+        call calc_qhu_qhv          (block, old_state, tend, dt)
+        call calc_dkedlon_dkedlat  (block, old_state, tend, dt)
+        call calc_wedudlev_wedvdlev(block, old_state, tend, dt)
+
+        call pgf_run               (block, new_state, tend)
+
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
           do j = mesh%full_lat_ibeg_no_pole, mesh%full_lat_iend_no_pole
             do i = mesh%half_lon_ibeg, mesh%half_lon_iend
@@ -533,9 +531,6 @@ contains
         call smag_damp_run(blocks(iblk), dt, blocks(iblk)%state(new))
       end if
       call test_forcing_run(blocks(iblk), dt, blocks(iblk)%state(new))
-      if (use_div_damp .or. use_vor_damp .or. use_polar_damp) then
-        call operators_prepare(blocks(iblk), blocks(iblk)%state(new), dt, all_pass)
-      end if
     end do
 
   end subroutine time_integrate
