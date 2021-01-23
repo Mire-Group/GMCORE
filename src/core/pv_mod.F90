@@ -93,7 +93,7 @@ contains
           do i = mesh%half_lon_ibeg, mesh%half_lon_iend
             order_reduce(:,i) = - state%u(:,i,j+1,k) * mesh%de_lon(j+1)
           end do
-          call zonal_sum_ensure_order(proc%zonal_comm , order_reduce, pole(:,k))
+          call zonal_sum_ensure_order(proc%zonal_comm , order_reduce, pole(:,k),'calc_vor_vtx')
         end do
 #else
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
@@ -118,7 +118,7 @@ contains
           do i = mesh%half_lon_ibeg, mesh%half_lon_iend
             order_reduce(:,i) = state%u(:,i,j,k) * mesh%de_lon(j)
           end do
-          call zonal_sum_ensure_order(proc%zonal_comm , order_reduce, pole(:,k))
+          call zonal_sum_ensure_order(proc%zonal_comm , order_reduce, pole(:,k),'calc_vor_vtx')
         end do
 #else
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend

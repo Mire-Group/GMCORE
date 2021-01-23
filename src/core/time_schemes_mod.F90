@@ -58,6 +58,8 @@ contains
       time_integrator => runge_kutta_4th
     case ('ssprk3')
       time_integrator => ssp_runge_kutta_3rd
+    case ('euler')
+      time_integrator => euler
     case default
       time_integrator => predict_correct
     end select

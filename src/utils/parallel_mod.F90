@@ -1109,19 +1109,21 @@ contains
 
   end subroutine zonal_sum_ensure_order_1d_r8
 
-  subroutine zonal_sum_ensure_order_2d_r8(comm, value , sum)
+  subroutine zonal_sum_ensure_order_2d_r8(comm, value , sum , pos_name)
 
     integer, intent(in) :: comm
     real(8), intent(in) :: value(:,:)
     real(8), intent(out):: sum(:) 
+    character(*), optional , intent(in) :: pos_name
 
     integer status(MPI_STATUS_SIZE), ierr
-    integer numproc 
+    integer numproc , myid
     integer i , nm , nx
     real(8), allocatable :: allvalue(:,:)  
 
 
     call MPI_COMM_SIZE(comm,numproc,ierr)
+    call MPI_COMM_RANK(comm,myid,ierr)
     sum = 0.0_r8
     nm  = size(value,1)
     nx  = size(value,2)
@@ -1147,10 +1149,13 @@ contains
           call MPI_SEND(sum , nm , MPI_DOUBLE , i , 0 , comm , status,ierr)
         end do
         deallocate(allvalue)
+        
       else !other proc
         call MPI_SEND(value(:,:) , nx * nm , MPI_DOUBLE , 0 , 0 , comm , ierr)
         call MPI_RECV(sum , nm , MPI_DOUBLE , 0 , 0 , comm , status,ierr)
       end if  
+
+
 
     end if
 

@@ -53,7 +53,7 @@ contains
           do i = mesh%full_lon_ibeg, mesh%full_lon_iend
             order_reduce(:,i) = state%v(:,i,j,k)**2
           end do
-          call zonal_sum_ensure_order(proc%zonal_comm , order_reduce, pole(:,k))
+          call zonal_sum_ensure_order(proc%zonal_comm , order_reduce, pole(:,k),'ke')
         end do
 #else
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
@@ -63,7 +63,7 @@ contains
         end do
         call zonal_sum(proc%zonal_comm, pole)
 #endif
-        pole = pole / mesh%num_full_lon * 0.5_r8
+        pole = pole / global_mesh%num_full_lon * 0.5_r8
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
           do i = mesh%full_lon_ibeg, mesh%full_lon_iend
             state%ke(:,i,j,k) = pole(:,k)
@@ -78,7 +78,7 @@ contains
           do i = mesh%full_lon_ibeg, mesh%full_lon_iend
             order_reduce(:,i) = state%v(:,i,j-1,k)**2
           end do
-          call zonal_sum_ensure_order(proc%zonal_comm , order_reduce, pole(:,k))
+          call zonal_sum_ensure_order(proc%zonal_comm , order_reduce, pole(:,k),'ke')
         end do
 #else
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
@@ -88,7 +88,7 @@ contains
         end do
         call zonal_sum(proc%zonal_comm, pole)
 #endif
-        pole = pole / mesh%num_full_lon * 0.5_r8
+        pole = pole /  global_mesh%num_full_lon * 0.5_r8
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
           do i = mesh%full_lon_ibeg, mesh%full_lon_iend
             state%ke(:,i,j,k) = pole(:,k)

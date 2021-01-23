@@ -351,7 +351,7 @@ contains
         do i = mesh%full_lon_ibeg, mesh%full_lon_iend
           order_reduce(:,i) = state%v(:,i,j,k)
         end do
-        call zonal_sum_ensure_order(proc%zonal_comm , order_reduce, pole(:,k))
+        call zonal_sum_ensure_order(proc%zonal_comm , order_reduce, pole(:,k),'calc_div')
       end do  
 #else
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
@@ -376,7 +376,7 @@ contains
         do i = mesh%full_lon_ibeg, mesh%full_lon_iend
           order_reduce(:,i) = - state%v(:,i,j-1,k)
         end do
-        call zonal_sum_ensure_order(proc%zonal_comm , order_reduce, pole(:,k))
+        call zonal_sum_ensure_order(proc%zonal_comm , order_reduce, pole(:,k),'calc_div')
       end do 
 #else
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
@@ -1147,7 +1147,7 @@ contains
         do i = mesh%full_lon_ibeg, mesh%full_lon_iend
           order_reduce(:,i) = state%mf_lat_n(:,i,j,k)
         end do
-        call zonal_sum_ensure_order(proc%zonal_comm , order_reduce, pole(:,k))
+        call zonal_sum_ensure_order(proc%zonal_comm , order_reduce, pole(:,k),'calc_dmfdlon_dmfdlat')
       end do
 #else
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
@@ -1172,7 +1172,7 @@ contains
         do i = mesh%full_lon_ibeg, mesh%full_lon_iend
           order_reduce(:,i) = - state%mf_lat_n(:,i,j-1,k)
         end do
-        call zonal_sum_ensure_order(proc%zonal_comm , order_reduce, pole(:,k))
+        call zonal_sum_ensure_order(proc%zonal_comm , order_reduce, pole(:,k),'calc_dmfdlon_dmfdlat')
       end do
 #else
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
@@ -1260,7 +1260,7 @@ contains
           do i = mesh%full_lon_ibeg, mesh%full_lon_iend
             order_reduce(:,i) = state%mf_lat_n(:,i,j,k) * state%pt_lat(:,i,j,k)
           end do
-          call zonal_sum_ensure_order(proc%zonal_comm , order_reduce, pole(:,k))
+          call zonal_sum_ensure_order(proc%zonal_comm , order_reduce, pole(:,k),'calc_dptfdlon_dptfdlat')
         end do     
 #else
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
@@ -1285,7 +1285,7 @@ contains
           do i = mesh%full_lon_ibeg, mesh%full_lon_iend
             order_reduce(:,i) = - state%mf_lat_n(:,i,j-1,k) * state%pt_lat(:,i,j-1,k)
           end do
-          call zonal_sum_ensure_order(proc%zonal_comm , order_reduce, pole(:,k))
+          call zonal_sum_ensure_order(proc%zonal_comm , order_reduce, pole(:,k),'calc_dptfdlon_dptfdlat')
         end do  
 #else
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
