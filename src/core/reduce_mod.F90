@@ -67,7 +67,7 @@ contains
     integer iblk, itime, j, full_j
 
     do iblk = 1, size(blocks)
-      allocate(blocks(iblk)%reduced_mesh  (blocks(iblk)%mesh%full_lat_lb    :blocks(iblk)%mesh%full_lat_ub    ))
+      allocate(blocks(iblk)%reduced_mesh  (blocks(iblk)%mesh%full_lat_lb    :blocks(iblk)%mesh%full_lat_ub    )) ! 以纬圈为单位，每条纬圈分配一个reduced_mesh, reduced_static, reduced_state, reduced_tend
       allocate(blocks(iblk)%reduced_static(blocks(iblk)%mesh%full_lat_ibeg-1:blocks(iblk)%mesh%full_lat_iend+1))
       allocate(blocks(iblk)%reduced_state (blocks(iblk)%mesh%full_lat_ibeg-1:blocks(iblk)%mesh%full_lat_iend+1))
       allocate(blocks(iblk)%reduced_tend  (blocks(iblk)%mesh%full_lat_ibeg-1:blocks(iblk)%mesh%full_lat_iend+1))
@@ -127,6 +127,7 @@ contains
       ! Extend loop range by 1 is for Coriolis forces. FIXME: Revise it.
       do j = block%mesh%full_lat_ibeg - 1, block%mesh%full_lat_iend + 1
         if (block%reduced_mesh(j)%reduce_factor > 0) then
+          ! reduce_state()把细网格上的物理量（在简并区）转到粗网格上,reduce_state内对各个物理量做apply_reduce()
           call reduce_state(j, block, block%mesh, state, block%reduced_mesh(j), block%reduced_static(j), block%reduced_state(j), dt, pass)
         end if
       end do
@@ -177,35 +178,35 @@ contains
     reduced_mesh%half_lev_lb   = raw_mesh%half_lev_lb
     reduced_mesh%half_lev_ub   = raw_mesh%half_lev_ub
 
-    do buf_j = lbound(reduced_mesh%full_lat, 1), ubound(reduced_mesh%full_lat, 1)
+    do buf_j = lbound(reduced_mesh%full_lat, 1), ubound(reduced_mesh%full_lat, 1) ! -1:1
       if (j + buf_j >= raw_mesh%full_lat_lb .and. j + buf_j <= raw_mesh%full_lat_ub) then
         reduced_mesh%full_lat(buf_j) = raw_mesh%full_lat(j+buf_j)
       end if
     end do
-    do buf_j = lbound(reduced_mesh%half_lat, 1), ubound(reduced_mesh%half_lat, 1)
+    do buf_j = lbound(reduced_mesh%half_lat, 1), ubound(reduced_mesh%half_lat, 1) ! -1:1
       if (j + buf_j >= raw_mesh%half_lat_lb .and. j + buf_j <= raw_mesh%half_lat_ub) then
         reduced_mesh%half_lat(buf_j) = raw_mesh%half_lat(j+buf_j)
       end if
     end do
-    do buf_j = lbound(reduced_mesh%half_f, 1), ubound(reduced_mesh%half_f, 1)
+    do buf_j = lbound(reduced_mesh%half_f, 1), ubound(reduced_mesh%half_f, 1)     ! -2:1
       if (j + buf_j >= raw_mesh%half_lat_lb .and. j + buf_j <= raw_mesh%half_lat_ub) then
         reduced_mesh%half_f(buf_j) = raw_mesh%half_f(j+buf_j)
       end if
     end do
 
     ! Cell area
-    do buf_j = lbound(reduced_mesh%area_cell, 1), ubound(reduced_mesh%area_cell, 1)
+    do buf_j = lbound(reduced_mesh%area_cell, 1), ubound(reduced_mesh%area_cell, 1) ! -1:1
       if (raw_mesh%is_inside_with_halo_full_lat(j+buf_j)) then
         reduced_mesh%area_cell(buf_j) = raw_mesh%area_cell(j+buf_j) * reduce_factor
       end if
     end do
-    do buf_j = lbound(reduced_mesh%area_subcell, 2), ubound(reduced_mesh%area_subcell, 2)
+    do buf_j = lbound(reduced_mesh%area_subcell, 2), ubound(reduced_mesh%area_subcell, 2) ! 2,-2:2
       if (raw_mesh%is_inside_with_halo_full_lat(j+buf_j)) then
         reduced_mesh%area_subcell(1,buf_j) = raw_mesh%area_subcell(1,j+buf_j) * reduce_factor
         reduced_mesh%area_subcell(2,buf_j) = raw_mesh%area_subcell(2,j+buf_j) * reduce_factor
       end if
     end do
-    do buf_j = lbound(reduced_mesh%area_lon, 1), ubound(reduced_mesh%area_lon, 1)
+    do buf_j = lbound(reduced_mesh%area_lon, 1), ubound(reduced_mesh%area_lon, 1) ! -2:2
       if (raw_mesh%is_inside_with_halo_full_lat(j+buf_j)) then
         reduced_mesh%area_lon_west(buf_j) = raw_mesh%area_lon_west(j+buf_j) * reduce_factor
         reduced_mesh%area_lon_east(buf_j) = raw_mesh%area_lon_east(j+buf_j) * reduce_factor
@@ -213,12 +214,12 @@ contains
       end if
     end do
     ! Vertex area
-    do buf_j = lbound(reduced_mesh%area_vtx, 1), ubound(reduced_mesh%area_vtx, 1)
+    do buf_j = lbound(reduced_mesh%area_vtx, 1), ubound(reduced_mesh%area_vtx, 1) ! -2:1
       if (raw_mesh%is_inside_with_halo_half_lat(j+buf_j)) then
         reduced_mesh%area_vtx(buf_j) = raw_mesh%area_vtx(j+buf_j) * reduce_factor
       end if
     end do
-    do buf_j = lbound(reduced_mesh%area_lat, 1), ubound(reduced_mesh%area_lat, 1)
+    do buf_j = lbound(reduced_mesh%area_lat, 1), ubound(reduced_mesh%area_lat, 1) ! -2:1
       if (raw_mesh%is_inside_with_halo_half_lat(j+buf_j)) then
         reduced_mesh%area_lat_north(buf_j) = raw_mesh%area_lat_north(j+buf_j) * reduce_factor
         reduced_mesh%area_lat_south(buf_j) = raw_mesh%area_lat_south(j+buf_j) * reduce_factor
@@ -226,22 +227,22 @@ contains
       end if
     end do
     ! Edge lengths and cell distances
-    do buf_j = lbound(reduced_mesh%le_lat, 1), ubound(reduced_mesh%le_lat, 1)
+    do buf_j = lbound(reduced_mesh%le_lat, 1), ubound(reduced_mesh%le_lat, 1) ! -2:1
       if (raw_mesh%is_inside_with_halo_half_lat(j+buf_j)) then
         reduced_mesh%le_lat(buf_j) = raw_mesh%le_lat(j+buf_j) * reduce_factor
       end if
     end do
-    do buf_j = lbound(reduced_mesh%de_lat, 1), ubound(reduced_mesh%de_lat, 1)
+    do buf_j = lbound(reduced_mesh%de_lat, 1), ubound(reduced_mesh%de_lat, 1) ! -2:1
       if (raw_mesh%is_inside_with_halo_half_lat(j+buf_j)) then
         reduced_mesh%de_lat(buf_j) = raw_mesh%de_lat(j+buf_j)
       end if
     end do
-    do buf_j = lbound(reduced_mesh%le_lon, 1), ubound(reduced_mesh%le_lon, 1)
+    do buf_j = lbound(reduced_mesh%le_lon, 1), ubound(reduced_mesh%le_lon, 1) ! -1:1
       if (raw_mesh%is_inside_with_halo_full_lat(j+buf_j)) then
         reduced_mesh%le_lon(buf_j) = raw_mesh%le_lon(j+buf_j)
       end if
     end do
-    do buf_j = lbound(reduced_mesh%de_lon, 1), ubound(reduced_mesh%de_lon, 1)
+    do buf_j = lbound(reduced_mesh%de_lon, 1), ubound(reduced_mesh%de_lon, 1) ! -2:2
       if (raw_mesh%is_inside_with_halo_full_lat(j+buf_j)) then
         reduced_mesh%de_lon(buf_j) = raw_mesh%de_lon(j+buf_j) * reduce_factor
       end if
@@ -257,7 +258,7 @@ contains
       end if
     end do
 #else
-    do buf_j = lbound(reduced_mesh%full_tangent_wgt, 2), ubound(reduced_mesh%full_tangent_wgt, 2)
+    do buf_j = lbound(reduced_mesh%full_tangent_wgt, 2), ubound(reduced_mesh%full_tangent_wgt, 2) ! 2,-1:1
       if (reduced_mesh%le_lat(buf_j-1) /= 0 .and. reduced_mesh%de_lon(buf_j) /= 0) then
         reduced_mesh%full_tangent_wgt(1,buf_j) = reduced_mesh%le_lat(buf_j-1) / reduced_mesh%de_lon(buf_j) * 0.25_r8
       end if
@@ -277,7 +278,7 @@ contains
       end if
     end do
 #else
-    do buf_j = lbound(reduced_mesh%half_tangent_wgt, 2), ubound(reduced_mesh%half_tangent_wgt, 2)
+    do buf_j = lbound(reduced_mesh%half_tangent_wgt, 2), ubound(reduced_mesh%half_tangent_wgt, 2) ! 2,-1:0
       if (reduced_mesh%le_lon(buf_j  ) /= 0 .and. reduced_mesh%de_lat(buf_j) /= 0) then
         reduced_mesh%half_tangent_wgt(1,buf_j) = reduced_mesh%le_lon(buf_j  ) / reduced_mesh%de_lat(buf_j) * 0.25_r8
       end if
@@ -295,7 +296,7 @@ contains
     type(reduced_state_type), intent(inout) :: reduced_state
 
     integer is, ie, ks, ke, i1, i2, i3
-
+                                                            ! 垂向lev                                            纬向lon                                          buf_bound           简并度(相当于纵深，有多少个简并度，就有多少层纵深)   
 #define full_lev_full_lon_dims(x, buf_bound) reduced_state%x(reduced_mesh%full_lev_lb:reduced_mesh%full_lev_ub,reduced_mesh%full_lon_lb:reduced_mesh%full_lon_ub,buf_bound,reduced_mesh%reduce_factor)
 #define full_lev_half_lon_dims(x, buf_bound) reduced_state%x(reduced_mesh%full_lev_lb:reduced_mesh%full_lev_ub,reduced_mesh%half_lon_lb:reduced_mesh%half_lon_ub,buf_bound,reduced_mesh%reduce_factor)
 #define half_lev_full_lon_dims(x, buf_bound) reduced_state%x(reduced_mesh%half_lev_lb:reduced_mesh%half_lev_ub,reduced_mesh%full_lon_lb:reduced_mesh%full_lon_ub,buf_bound,reduced_mesh%reduce_factor)
@@ -590,7 +591,7 @@ contains
     integer buf_j, move
 
     do move = 1, reduced_mesh%reduce_factor
-      do buf_j = buf_lb, buf_ub
+      do buf_j = buf_lb, buf_ub ! 逐个buf纬圈做投影
         call reduce_sub(j, buf_j, move, block, raw_mesh, raw_state, reduced_mesh, reduced_static, reduced_state, dt)
       end do
     end do
