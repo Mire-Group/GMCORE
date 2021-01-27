@@ -155,7 +155,7 @@ contains
     allocate(reduced_mesh%weights(reduce_factor))
     reduced_mesh%weights = 1.0_r8 / reduce_factor
 
-    reduced_mesh%halo_width    = 1
+    reduced_mesh%halo_width    = 1  ! 这是粗网格的halo_width
     reduced_mesh%num_full_lon  = raw_mesh%num_full_lon / reduce_factor
     reduced_mesh%num_half_lon  = raw_mesh%num_half_lon / reduce_factor
     reduced_mesh%full_lon_ibeg = raw_mesh%full_lon_ibeg / reduce_factor + 1
