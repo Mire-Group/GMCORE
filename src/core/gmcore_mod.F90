@@ -50,6 +50,7 @@ contains
 
     call log_init()
     call global_mesh%init_global(num_lon, num_lat, num_lev, lon_halo_width=max(2, maxval(reduce_factors) - 1), lat_halo_width=2)
+    ! 为减少通信量，lon_halo_width可以直接用2，不要用maxval(reduce_factors) - 1
     !call debug_check_areas()
     call process_init()
     call vert_coord_init(num_lev, namelist_path)
@@ -57,7 +58,7 @@ contains
     call time_init()
     call history_init()
     call restart_init()
-    call reduce_init(proc%blocks)
+    call reduce_init(proc%blocks) ! 在对简并区，才单独用maxval(reduce_factors)-1
     call time_scheme_init()
     call pgf_init()
     call damp_init()
