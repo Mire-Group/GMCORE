@@ -172,6 +172,7 @@ contains
     write(*, *) 'num_lev             = ', to_str(num_lev)
     write(*, *) 'num_proc_lon        = ', to_str(num_proc_lon)
     write(*, *) 'num_proc_lat        = ', to_str(num_proc_lat)
+    write(*, *) 'reduce_factors"     = ', to_str(reduce_factors)
     write(*, *) 'vert_coord_scheme   = ', trim(vert_coord_scheme)
     write(*, *) 'vert_coord_template = ', trim(vert_coord_template)
     write(*, *) 'dt_in_seconds       = ', to_str(int(dt_in_seconds))

@@ -1,25 +1,31 @@
 &gmcore_control
-num_lon = 180
-num_lat = 90
-num_lev = 26
-num_proc_lon = 1
-num_proc_lat = 30
-test_case = 'baroclinic_wave'
-run_days = 10
-time_scheme = 'pc2'
-dt_in_seconds = 100
-!split_scheme = 'csp2'
-!fast_cycles = 6
-pv_scheme = 3
-case_name = 'bw.01.180x90.l26'
-history_interval = '6 hours'
-print_interval = '1 hours'
-reduce_factors = 6, 6, 4, 2
-damp_orders    = 4, 6, 6, 6
-use_div_damp = .true.
-div_damp_order = 2
-/
-
-&hybrid_coord
-template = 'test_l26'
+  num_lon             = 180
+  num_lat             = 90
+  num_lev             = 26
+  num_proc_lon        = 1
+  num_proc_lat        = 30
+  vert_coord_scheme   = 'hybrid'
+  vert_coord_template = 'test_l26'
+  test_case           = 'baroclinic_wave'
+  run_days            = 1
+  time_scheme         = 'pc2'
+  dt_in_seconds       = 10
+  pv_scheme           = 1
+  ke_scheme           = 2
+  upwind_order        = 3
+  upwind_wgt_pt       = 0.5
+  case_name           = 'bw.decomp.180x90.l26'
+  history_interval    = '1 hours'
+  output_debug        = .true.
+! reduce_factors      = 9 6 3 2 2 2 2
+  reduce_pv_directly  = .true.
+  do_reduce_ke        = .true.
+  use_div_damp        = .false.
+  use_vor_damp        = .false.
+  vor_damp_coef2      = 0.005
+  vor_damp_lat0       = 60
+  use_smag_damp       = .false.
+  smag_damp_coef      = 0.2
+  use_polar_damp      = .false.
+  polar_damp_lat0     = 85
 /
