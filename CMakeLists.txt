@@ -5,6 +5,7 @@ project(gmcore LANGUAGES Fortran)
 option(V_POLE "Stagger V on the two Poles" OFF)
 option(R4 "Use single precision" OFF)
 option(R16 "Use quadruple precision" OFF)
+option(ENSURE_ORDER "Ensure computation order in parallel" OFF)
 
 if (V_POLE)
   add_definitions(-DV_POLE)
@@ -19,6 +20,11 @@ elseif (R16)
   add_definitions(-DREAL_KIND=16)
 	set(CPPFLAGS ${CPPFLAGS} -DREAL_KIND=16)
   message(STATUS "Use quadruple precision.")
+endif ()
+if (ENSURE_ORDER)
+  add_definitions(-DENSURE_ORDER)
+  set(CPPFLAGS ${CPPFLAGS} -DENSURE_ORDER)
+  message(STATUS "Ensure computation order in parallel.")
 endif ()
 
 if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
@@ -39,7 +45,6 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Intel")
 endif ()
 
 find_package(MPI)
-include_directories(SYSTEM ${MPI_Fortran_INCLUDE_DIRS})
 
 if (DEFINED ENV{NETCDF} AND (NOT DEFINED ENV{NETCDF_ROOT}))
   set(ENV{NETCDF_ROOT} $ENV{NETCDF})
@@ -114,6 +119,7 @@ set(gmcore_files
   src/core/pgf/pgf_swm_mod.F90
   src/core/pgf/pgf_sb81_mod.F90
   src/core/pgf/pgf_lin97_mod.F90
+  src/core/pgf/pgf_dflx_mod.F90
   src/core/mesh_mod.F90
   src/core/vert_coord/sigma_coord_mod.F90
   src/core/vert_coord/hybrid_coord_test_mod.F90
@@ -128,6 +134,7 @@ set(gmcore_files
   src/core/tend_mod.F90
   src/core/pv_mod.F90
   src/core/ke_mod.F90
+  src/core/nh_mod.F90
   src/core/interp_mod.F90
   src/core/operators_mod.F90
   src/core/reduced_types_mod.F90
@@ -152,17 +159,20 @@ set(gmcore_files
   src/tests/mountain_wave_test_mod.F90
   src/tests/baroclinic_wave_test_mod.F90
   src/tests/held_suarez_test_mod.F90
+  src/tests/steady_state_pgf_test_mod.F90
+  src/tests/ksp15_test_mod.F90
   lib/quadpack.f90
 )
 
 add_library(gmcore ${gmcore_files})
-target_link_libraries(gmcore netcdff fortran_container fortran_datetime fiona flogger ${MPI_Fortran_LIBRARIES} ${MKL_LIBRARIES})
+target_link_libraries(gmcore netcdff fortran_container fortran_datetime fiona flogger ${MKL_LIBRARIES})
 
 set(gmcore_prepare_files
   src/prepare/topo_mod.F90
   src/prepare/latlon_interp_mod.F90
   src/prepare/vert_interp_mod.F90
   src/prepare/era5_reader_mod.F90
+  src/prepare/mpas_reader_mod.F90
   src/prepare/bkg_mod.F90
   src/prepare/gmcore_prepare.F90
 )

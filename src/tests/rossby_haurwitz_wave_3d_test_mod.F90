@@ -11,19 +11,19 @@ module rossby_haurwitz_wave_3d_test_mod
 
   private
 
-  public rossby_haurwitz_wave_3d_test_set_initial_condition
+  public rossby_haurwitz_wave_3d_test_set_ic
 
   integer , parameter :: n     = 4
   real(r8), parameter :: gz0   = 8d3 * g
   real(r8), parameter :: u0    = 50d0               ! m s-1
-  real(r8), parameter :: M     = u0 / (n * radius)
+  real(r8)            :: M
   real(r8), parameter :: t0    = 288d0              ! K
   real(r8), parameter :: gamma = 0.0065d0           ! K m-1
   real(r8), parameter :: pref  = 955d2              ! Pa
 
 contains
 
-  subroutine rossby_haurwitz_wave_3d_test_set_initial_condition(block)
+  subroutine rossby_haurwitz_wave_3d_test_set_ic(block)
 
     type(block_type), intent(inout), target :: block
 
@@ -32,6 +32,8 @@ contains
     integer i, j, k
     type(mesh_type), pointer :: mesh
     type(state_type), pointer :: state
+
+    M = u0 / (n * radius)
 
     mesh => block%mesh
     state => block%state(1)
@@ -124,6 +126,6 @@ contains
     end do
     call fill_halo(block, state%gz_lev, full_lon=.true., full_lat=.true., full_lev=.false.)
 
-  end subroutine rossby_haurwitz_wave_3d_test_set_initial_condition
+  end subroutine rossby_haurwitz_wave_3d_test_set_ic
 
 end module rossby_haurwitz_wave_3d_test_mod

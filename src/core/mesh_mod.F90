@@ -116,6 +116,8 @@ module mesh_mod
     procedure :: is_south_pole => mesh_is_south_pole
     procedure :: is_north_pole => mesh_is_north_pole
     procedure :: is_pole => mesh_is_pole
+    procedure :: is_full_lat_next_to_pole => mesh_is_full_lat_next_to_pole
+    procedure :: is_half_lat_next_to_pole => mesh_is_half_lat_next_to_pole
     procedure :: is_inside_with_halo_full_lat => mesh_is_inside_with_halo_full_lat
     procedure :: is_inside_with_halo_half_lat => mesh_is_inside_with_halo_half_lat
     procedure :: is_outside_pole_full_lat => mesh_is_outside_pole_full_lat
@@ -171,6 +173,10 @@ contains
 
     ! Here we set baroclinic according to levels.
     baroclinic = this%num_full_lev > 1
+    if (.not. baroclinic) then
+      hydrostatic = .false.
+      nonhydrostatic = .false.
+    end if
 
     this%id             = merge(id            , -1, present(id))
     this%lon_halo_width = merge(lon_halo_width,  1, present(lon_halo_width))
@@ -198,29 +204,17 @@ contains
       if (abs(this%full_lat(j)) < 1.0e-12) this%full_lat(j) = 0.0_r8
     end do
 
-    if (coarse_polar_lat0 /= 0) then
+    if (coarse_pole_mul /= 0) then
       ! Calculate real dlat which is large at polar region.
-      j0 = 0
-      do j = 1, this%num_half_lat
-        if (this%half_lat(j) >= -coarse_polar_lat0 * rad) then
-          j0 = j
-          exit
-        end if
+      do j = 1, this%num_full_lat
+        this%dlat(j) = dlat0 * (1 + (coarse_pole_mul - 1) * exp(-coarse_pole_decay * (abs(this%full_lat(j)) - pi05)**2))
       end do
-      do j = 1, this%num_half_lat
-        if (this%half_lat(j) <= 0) then
-          jj = j - this%half_lat_ibeg_no_pole + 1
-        else
-          jj = this%half_lat_iend_no_pole - j + 1
-        end if
-        this%dlat(j) = dlat0 * (1 + exp(jj**2 * log(coarse_polar_decay) / j0**2))
-      end do
-      this%dlat(1:this%num_half_lat) = this%dlat(1:this%num_half_lat) / sum(this%dlat(1:this%num_half_lat)) * pi
+      this%dlat(1:this%num_full_lat) = this%dlat(1:this%num_full_lat) / sum(this%dlat(1:this%num_full_lat)) * pi
     else
-      this%dlat(1:this%num_half_lat) = dlat0
+      this%dlat(1:this%num_full_lat) = dlat0
     end if
 
-    ! Set latitudes of half merdional grids.
+    ! Set latitudes of full merdional grids.
     this%half_lat(1) = this%start_lat
     this%half_lat_deg(1) = this%start_lat * deg
     do j = 2, this%num_half_lat - 1
@@ -231,7 +225,7 @@ contains
     this%half_lat(this%num_half_lat) = this%end_lat
     this%half_lat_deg(this%num_half_lat) = this%end_lat * deg
 
-    ! Set latitudes of full merdional grids.
+    ! Set latitudes of half merdional grids.
     do j = 1, this%num_full_lat
       if (is_inf(this%half_lat(j)) .or. this%half_lat(j) == pi05) cycle
       this%full_lat(j) = this%half_lat(j) + 0.5_r8 * this%dlat(j)
@@ -246,22 +240,11 @@ contains
       if (abs(this%half_lat(j)) < 1.0e-12) this%half_lat(j) = 0.0_r8
     end do
 
-    if (coarse_polar_lat0 /= 0) then
+    if (coarse_pole_mul /= 0) then
       ! Calculate real dlat which is large at polar region.
-      j0 = 0
+      dlat0 = this%dlon
       do j = 1, this%num_half_lat
-        if (this%half_lat(j) >= -coarse_polar_lat0 * rad) then
-          j0 = j
-          exit
-        end if
-      end do
-      do j = 1, this%num_half_lat
-        if (this%half_lat(j) <= 0) then
-          jj = j - this%half_lat_ibeg_no_pole + 1
-        else
-          jj = this%half_lat_iend_no_pole - j + 1
-        end if
-        this%dlat(j) = dlat0 * (1 + exp(jj**2 * log(coarse_polar_decay) / j0**2))
+        this%dlat(j) = dlat0 * (1 + (coarse_pole_mul - 1) * exp(-coarse_pole_decay * (abs(this%half_lat(j)) - pi05)**2))
       end do
       this%dlat(1:this%num_half_lat) = this%dlat(1:this%num_half_lat) / sum(this%dlat(1:this%num_half_lat)) * pi
     else
@@ -878,7 +861,8 @@ contains
     class(mesh_type), intent(in) :: this
     integer, intent(in) :: j
 
-    res = this%has_south_pole() .and. j == 1
+    ! FIXME: has_south_pole should be removed.
+    res = j == 1
 
   end function mesh_is_south_pole
 
@@ -888,9 +872,9 @@ contains
     integer, intent(in) :: j
 
 #ifdef V_POLE
-    res = this%has_north_pole() .and. j == global_mesh%num_half_lat
+    res = j == global_mesh%num_half_lat
 #else
-    res = this%has_north_pole() .and. j == global_mesh%num_full_lat
+    res = j == global_mesh%num_full_lat
 #endif
 
   end function mesh_is_north_pole
@@ -903,6 +887,32 @@ contains
     res = this%is_south_pole(j) .or. this%is_north_pole(j)
 
   end function mesh_is_pole
+
+  logical function mesh_is_full_lat_next_to_pole(this, j) result(res)
+
+    class(mesh_type), intent(in) :: this
+    integer, intent(in) :: j
+
+#ifdef V_POLE
+    res = j == 1 .or. j == global_mesh%num_full_lat
+#else
+    res = j == 2 .or. j == global_mesh%num_full_lat - 1
+#endif
+
+  end function mesh_is_full_lat_next_to_pole
+
+  logical function mesh_is_half_lat_next_to_pole(this, j) result(res)
+
+    class(mesh_type), intent(in) :: this
+    integer, intent(in) :: j
+
+#ifdef V_POLE
+    res = j == 2 .or. j == global_mesh%num_half_lat - 1
+#else
+    res = j == 1 .or. j == global_mesh%num_half_lat
+#endif
+
+  end function mesh_is_half_lat_next_to_pole
 
   logical function mesh_is_inside_with_halo_full_lat(this, j) result(res)
 

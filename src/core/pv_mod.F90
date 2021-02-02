@@ -13,19 +13,21 @@ module pv_mod
 
   private
 
-  public calc_vor_vtx
-  public calc_pv_vtx
-  public calc_pv_edge_midpoint
-  public calc_pv_edge_apvm
+  public calc_vor
+  public diag_pv
+  public interp_pv_midpoint
+  public interp_pv_apvm
 
 contains
 
-  subroutine calc_vor_vtx(block, state)
+  subroutine calc_vor(block, state, dt)
 
     type(block_type), intent(in) :: block
     type(state_type), intent(inout) :: state
+    real(r8), intent(in) :: dt
 
     type(mesh_type), pointer :: mesh
+    real(r8) work(state%mesh%half_lon_ibeg:state%mesh%half_lon_iend,state%mesh%num_full_lev)
     real(r8) pole(state%mesh%num_full_lev)
     integer i, j, k
     real(r8) order_reduce(state%mesh%half_lon_ibeg : state%mesh%half_lon_iend)
@@ -52,14 +54,13 @@ contains
 #ifdef V_POLE
     if (mesh%has_south_pole()) then
       j = mesh%half_lat_ibeg
-      pole = 0.0_r8
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
         do i = mesh%half_lon_ibeg, mesh%half_lon_iend
-          pole(k) = pole(k) - state%u(i,j,k) * mesh%de_lon(j)
+          work(i,k) = - state%u(i,j,k) * mesh%de_lon(j)
         end do
       end do
-      call zonal_sum(proc%zonal_comm, pole)
-      pole = pole / mesh%num_half_lon / mesh%area_vtx(j)
+      call zonal_sum(proc%zonal_circle, work, pole)
+      pole = pole / global_mesh%num_half_lon / mesh%area_vtx(j)
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
         do i = mesh%half_lon_ibeg, mesh%half_lon_iend
           state%vor(i,j,k) = pole(k)
@@ -68,14 +69,13 @@ contains
     end if
     if (mesh%has_north_pole()) then
       j = mesh%half_lat_iend
-      pole = 0.0_r8
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
         do i = mesh%half_lon_ibeg, mesh%half_lon_iend
-          pole(k) = pole(k) + state%u(i,j-1,k) * mesh%de_lon(j-1)
+          work(i,k) = state%u(i,j-1,k) * mesh%de_lon(j-1)
         end do
       end do
-      call zonal_sum(proc%zonal_comm, pole)
-      pole = pole / mesh%num_half_lon / mesh%area_vtx(j)
+      call zonal_sum(proc%zonal_circle, work, pole)
+      pole = pole / global_mesh%num_half_lon / mesh%area_vtx(j)
       do k = mesh%full_lev_ibeg, mesh%full_lev_iend
         do i = mesh%half_lon_ibeg, mesh%half_lon_iend
           state%vor(i,j,k) = pole(k)
@@ -87,6 +87,7 @@ contains
       ! Special treatment of vorticity around Poles
       if (mesh%has_south_pole()) then
         j = mesh%half_lat_ibeg
+<<<<<<< HEAD
         pole = 0.0_r8
 #ifdef Ensure_Order
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
@@ -96,13 +97,19 @@ contains
           call zonal_sum_ensure_order(proc%zonal_comm , order_reduce, pole(k))
         end do
 #else
+=======
+>>>>>>> d6743305aacfa3051b6ab0a51033b03804347848
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
           do i = mesh%half_lon_ibeg, mesh%half_lon_iend
-            pole(k) = pole(k) - state%u(i,j+1,k) * mesh%de_lon(j+1)
+            work(i,k) = - state%u(i,j+1,k) * mesh%de_lon(j+1)
           end do
         end do
+<<<<<<< HEAD
         call zonal_sum(proc%zonal_comm, pole)
 #endif
+=======
+        call zonal_sum(proc%zonal_circle, work, pole)
+>>>>>>> d6743305aacfa3051b6ab0a51033b03804347848
         pole = pole / global_mesh%num_half_lon / mesh%area_vtx(j)
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
           do i = mesh%half_lon_ibeg, mesh%half_lon_iend
@@ -112,6 +119,7 @@ contains
       end if
       if (mesh%has_north_pole()) then
         j = mesh%half_lat_iend
+<<<<<<< HEAD
         pole = 0.0_r8
 #ifdef Ensure_Order
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
@@ -121,13 +129,19 @@ contains
           call zonal_sum_ensure_order(proc%zonal_comm , order_reduce, pole(k))
         end do
 #else
+=======
+>>>>>>> d6743305aacfa3051b6ab0a51033b03804347848
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
           do i = mesh%half_lon_ibeg, mesh%half_lon_iend
-            pole(k) = pole(k) + state%u(i,j,k) * mesh%de_lon(j)
+            work(i,k) = state%u(i,j,k) * mesh%de_lon(j)
           end do
         end do
+<<<<<<< HEAD
         call zonal_sum(proc%zonal_comm, pole)
 #endif
+=======
+        call zonal_sum(proc%zonal_circle, work, pole)
+>>>>>>> d6743305aacfa3051b6ab0a51033b03804347848
         pole = pole / global_mesh%num_half_lon / mesh%area_vtx(j)
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
           do i = mesh%half_lon_ibeg, mesh%half_lon_iend
@@ -139,18 +153,19 @@ contains
 #endif
     call fill_halo(block, state%vor, full_lon=.false., full_lat=.false., full_lev=.true.)
 
-  end subroutine calc_vor_vtx
+  end subroutine calc_vor
 
-  subroutine calc_pv_vtx(block, state)
+  subroutine diag_pv(block, state, dt)
 
     type(block_type), intent(in) :: block
     type(state_type), intent(inout) :: state
+    real(r8), intent(in) :: dt
 
     type(mesh_type), pointer :: mesh
     real(r8) pole(state%mesh%num_full_lev)
     integer i, j, k
 
-    call calc_vor_vtx(block, state)
+    call calc_vor(block, state, dt)
 
     mesh => state%mesh
 
@@ -163,7 +178,7 @@ contains
     end do
     call fill_halo(block, state%pv, full_lon=.false., full_lat=.false., full_lev=.true.)
 
-  end subroutine calc_pv_vtx
+  end subroutine diag_pv
 
   subroutine calc_dpv_edge(block, state)
 
@@ -239,7 +254,7 @@ contains
 
   end subroutine calc_dpv_edge
 
-  subroutine calc_pv_edge_midpoint(block, state)
+  subroutine interp_pv_midpoint(block, state)
 
     type(block_type), intent(in) :: block
     type(state_type), intent(inout) :: state
@@ -281,9 +296,9 @@ contains
     !call fill_halo(block, state%pv_lon, full_lon=.false., full_lat=.true., full_lev=.true.)
 #endif
 
-  end subroutine calc_pv_edge_midpoint
+  end subroutine interp_pv_midpoint
 
-  subroutine calc_pv_edge_apvm(block, state, dt)
+  subroutine interp_pv_apvm(block, state, dt)
 
     type(block_type), intent(in) :: block
     type(state_type), intent(inout) :: state
@@ -352,6 +367,6 @@ contains
     !call fill_halo(block, state%pv_lon, full_lon=.false., full_lat=.true., full_lev=.true.)
 #endif
 
-  end subroutine calc_pv_edge_apvm
+  end subroutine interp_pv_apvm
 
 end module pv_mod

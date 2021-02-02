@@ -1,17 +1,19 @@
 module mountain_wave_test_mod
 
   use flogger
+  use namelist_mod
   use const_mod
   use parallel_mod
   use block_mod
   use vert_coord_mod
   use formula_mod
+  use operators_mod
 
   implicit none
 
   private
 
-  public mountain_wave_test_set_initial_condition
+  public mountain_wave_test_set_ic
 
   real(r8), parameter :: T0   = 288.d0      ! K
   real(r8), parameter :: h0   = 2000.d0     ! m
@@ -25,7 +27,7 @@ module mountain_wave_test_mod
 
 contains
 
-  subroutine mountain_wave_test_set_initial_condition(block)
+  subroutine mountain_wave_test_set_ic(block)
 
     type(block_type), intent(inout), target :: block
     real(r8) cos_lat, sin_lat, full_lon, r
@@ -99,7 +101,11 @@ contains
     end do
     call fill_halo(block, state%t, full_lon=.true., full_lat=.true., full_lev=.true.)
     call fill_halo(block, state%pt, full_lon=.true., full_lat=.true., full_lev=.true.)
+
+    if (nonhydrostatic) then
+      call diag_gz_lev(block, state)
+    end if
   
-  end subroutine mountain_wave_test_set_initial_condition
+  end subroutine mountain_wave_test_set_ic
   
 end module mountain_wave_test_mod

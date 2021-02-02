@@ -9,21 +9,23 @@ module steady_geostrophic_flow_test_mod
 
   private
 
-  public steady_geostrophic_flow_test_set_initial_condition
+  public steady_geostrophic_flow_test_set_ic
 
   real(r8), parameter :: alpha = 0.0_r8
-  real(r8), parameter :: u0 = 2.0_r8 * pi * radius / (12.0_r8 * 86400.0_r8)
+  real(r8)            :: u0
   real(r8), parameter :: gz0 = 2.94e4_r8 ! m2 s-2
 
 contains
 
-  subroutine steady_geostrophic_flow_test_set_initial_condition(block)
+  subroutine steady_geostrophic_flow_test_set_ic(block)
 
     type(block_type), intent(inout), target :: block
 
     real(r8) cos_lat, sin_lat, cos_lon, sin_lon, cos_alpha, sin_alpha
     integer i, j
     type(mesh_type), pointer :: mesh
+
+    u0 = 2.0_r8 * pi * radius / (12.0_r8 * 86400.0_r8)
 
     mesh => block%mesh
 
@@ -59,6 +61,6 @@ contains
     end do
     call fill_halo(block, block%state(1)%gz, full_lon=.true., full_lat=.true.)
 
-  end subroutine steady_geostrophic_flow_test_set_initial_condition
+  end subroutine steady_geostrophic_flow_test_set_ic
 
 end module steady_geostrophic_flow_test_mod
