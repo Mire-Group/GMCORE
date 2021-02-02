@@ -16,6 +16,7 @@ module operators_mod
   use pgf_mod
   use interp_mod
   use reduce_mod
+  use pa_mod
 
   implicit none
 

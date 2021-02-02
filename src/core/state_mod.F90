@@ -162,12 +162,6 @@ contains
     call allocate_array(mesh, this%vor              , half_lon=.true., half_lat=.true., full_lev=.true.)
     call allocate_array(mesh, this%ak               , full_lon=.true., full_lat=.true., full_lev=.true.)
 
-<<<<<<< HEAD
-    call allocate_array(mesh, this%test           , full_lon=.true., full_lat=.true., full_lev=.true.)
-
-    if (baroclinic .and. .not. hydrostatic) then
-      call allocate_array(mesh, this%w            , full_lon=.true., full_lat=.true., half_lev=.true.)
-=======
     if (nonhydrostatic) then
       call allocate_array(mesh, this%m_lev          , full_lon=.true., full_lat=.true., half_lev=.true.)
       call allocate_array(mesh, this%wedphdlev      , full_lon=.true., full_lat=.true., full_lev=.true.)
@@ -188,7 +182,6 @@ contains
       call allocate_array(mesh, this%mf_lev_lat_n   , full_lon=.true., half_lat=.true., half_lev=.true.)
     else
       this%p_lev => this%ph_lev
->>>>>>> d6743305aacfa3051b6ab0a51033b03804347848
     end if
 
     if (pgf_scheme == 'sb81') then

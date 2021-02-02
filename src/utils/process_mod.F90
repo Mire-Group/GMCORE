@@ -70,12 +70,9 @@ module process_mod
     integer lon_iend
     integer lat_ibeg
     integer lat_iend
-<<<<<<< HEAD
 
     logical NeedReduce
-=======
     type(zonal_circle_type) zonal_circle
->>>>>>> d6743305aacfa3051b6ab0a51033b03804347848
     type(process_neighbor_type), allocatable :: ngb(:) ! Neighbor processes
     type(block_type), allocatable :: blocks(:)
 
@@ -103,13 +100,9 @@ contains
     call MPI_COMM_SIZE(proc%comm, proc%np, ierr)
     call MPI_COMM_RANK(proc%comm, proc%id, ierr)
 
-<<<<<<< HEAD
     proc%NeedReduce = 0
 
-    call setup_mpi_1d_lat()
-=======
     call setup_mpi_simple()
->>>>>>> d6743305aacfa3051b6ab0a51033b03804347848
     call decompose_domains()
     call setup_zonal_comm_for_reduce()
 

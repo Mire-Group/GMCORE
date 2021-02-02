@@ -87,29 +87,12 @@ contains
       ! Special treatment of vorticity around Poles
       if (mesh%has_south_pole()) then
         j = mesh%half_lat_ibeg
-<<<<<<< HEAD
-        pole = 0.0_r8
-#ifdef Ensure_Order
-        do k = mesh%full_lev_ibeg, mesh%full_lev_iend
-          do i = mesh%half_lon_ibeg, mesh%half_lon_iend
-            order_reduce(i) = - state%u(i,j+1,k) * mesh%de_lon(j+1)
-          end do
-          call zonal_sum_ensure_order(proc%zonal_comm , order_reduce, pole(k))
-        end do
-#else
-=======
->>>>>>> d6743305aacfa3051b6ab0a51033b03804347848
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
           do i = mesh%half_lon_ibeg, mesh%half_lon_iend
             work(i,k) = - state%u(i,j+1,k) * mesh%de_lon(j+1)
           end do
         end do
-<<<<<<< HEAD
-        call zonal_sum(proc%zonal_comm, pole)
-#endif
-=======
         call zonal_sum(proc%zonal_circle, work, pole)
->>>>>>> d6743305aacfa3051b6ab0a51033b03804347848
         pole = pole / global_mesh%num_half_lon / mesh%area_vtx(j)
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
           do i = mesh%half_lon_ibeg, mesh%half_lon_iend
@@ -119,29 +102,12 @@ contains
       end if
       if (mesh%has_north_pole()) then
         j = mesh%half_lat_iend
-<<<<<<< HEAD
-        pole = 0.0_r8
-#ifdef Ensure_Order
-        do k = mesh%full_lev_ibeg, mesh%full_lev_iend
-          do i = mesh%half_lon_ibeg, mesh%half_lon_iend
-            order_reduce(i) = state%u(i,j,k) * mesh%de_lon(j)
-          end do
-          call zonal_sum_ensure_order(proc%zonal_comm , order_reduce, pole(k))
-        end do
-#else
-=======
->>>>>>> d6743305aacfa3051b6ab0a51033b03804347848
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
           do i = mesh%half_lon_ibeg, mesh%half_lon_iend
             work(i,k) = state%u(i,j,k) * mesh%de_lon(j)
           end do
         end do
-<<<<<<< HEAD
-        call zonal_sum(proc%zonal_comm, pole)
-#endif
-=======
         call zonal_sum(proc%zonal_circle, work, pole)
->>>>>>> d6743305aacfa3051b6ab0a51033b03804347848
         pole = pole / global_mesh%num_half_lon / mesh%area_vtx(j)
         do k = mesh%full_lev_ibeg, mesh%full_lev_iend
           do i = mesh%half_lon_ibeg, mesh%half_lon_iend

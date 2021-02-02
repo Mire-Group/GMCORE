@@ -100,18 +100,8 @@ contains
 
         call fill_halo(block, new_state%phs, full_lon=.true., full_lat=.true.)
 
-<<<<<<< HEAD
-#ifdef Detail_Time
-  call Get_End_Time(tran_time_end)
-  write((20000+myid),*) , 1 , tran_time_end - tran_time_start , wait_time_end - wait_time_start
-#endif
-
-        call calc_ph_lev_ph(block, new_state)
-        call calc_m        (block, new_state)
-=======
         call diag_ph(block, new_state)
         call diag_m (block, new_state)
->>>>>>> d6743305aacfa3051b6ab0a51033b03804347848
       else if (tend%copy_phs) then
         new_state%phs    = old_state%phs
         new_state%ph_lev = old_state%ph_lev

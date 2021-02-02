@@ -188,41 +188,12 @@ contains
 
   subroutine print_namelist()
 
-<<<<<<< HEAD
-    write(*, *) '=================== GMCORE Parameters ==================='
-    write(*, *) 'num_lon             = ', to_str(num_lon)
-    write(*, *) 'num_lat             = ', to_str(num_lat)
-    write(*, *) 'num_lev             = ', to_str(num_lev)
-    write(*, *) 'num_proc_lon        = ', to_str(num_proc_lon)
-    write(*, *) 'num_proc_lat        = ', to_str(num_proc_lat)
-    write(*, *) 'reduce_factors"     = ', to_str(reduce_factors)
-    write(*, *) 'vert_coord_scheme   = ', trim(vert_coord_scheme)
-    write(*, *) 'vert_coord_template = ', trim(vert_coord_template)
-    write(*, *) 'dt_in_seconds       = ', to_str(int(dt_in_seconds))
-    write(*, *) 'pgf_scheme          = ', trim(pgf_scheme)
-    write(*, *) 'ke_scheme           = ', to_str(ke_scheme)
-    write(*, *) 'pv_scheme           = ', to_str(pv_scheme)
-    write(*, *) 'pv_pole_stokes      = ', to_str(pv_pole_stokes)
-    write(*, *) 'time_scheme         = ', trim(time_scheme)
-    write(*, *) 'upwind_order        = ', to_str(upwind_order)
-    write(*, *) 'use_div_damp        = ', to_str(use_div_damp)
-    write(*, *) 'div_damp_coef2      = ', to_str(div_damp_coef2, 3)
-    write(*, *) 'use_vor_damp        = ', to_str(use_vor_damp)
-    write(*, *) 'vor_damp_lat0       = ', to_str(vor_damp_lat0, 1)
-    write(*, *) 'vor_damp_decay      = ', to_str(vor_damp_decay, 1)
-    write(*, *) 'vor_damp_coef2      = ', to_str(vor_damp_coef2, 3)
-    write(*, *) 'use_polar_damp      = ', to_str(use_polar_damp)
-    write(*, *) 'use_rayleigh_damp   = ', to_str(use_rayleigh_damp)
-    write(*, *) 'use_smag_damp       = ', to_str(use_smag_damp)
-    write(*, *) 'smag_damp_coef      = ', to_str(smag_damp_coef, 1)
-    write(*, *) 'print_interval      = ', trim(print_interval)
-    write(*, *) 'history_interval    = ', trim(history_interval(1))
-    write(*, *) '========================================================='
-=======
       write(*, *) '=================== GMCORE Parameters ==================='
       write(*, *) 'num_lon             = ', to_str(num_lon)
       write(*, *) 'num_lat             = ', to_str(num_lat)
       write(*, *) 'num_lev             = ', to_str(num_lev)
+      write(*, *) 'num_proc_lon        = ', to_str(num_proc_lon)
+      write(*, *) 'num_proc_lat        = ', to_str(num_proc_lat)
     if (coarse_pole_mul /= 0) then
       write(*, *) 'coarse_pole_mul     = ', to_str(coarse_pole_mul, 3)
       write(*, *) 'coarse_pole_decay   = ', to_str(coarse_pole_decay, 3)
@@ -264,8 +235,9 @@ contains
     if (use_smag_damp) then
       write(*, *) 'smag_damp_coef      = ', to_str(smag_damp_coef, 1)
     end if
+      write(*, *) 'history_interval    = ', history_interval(1)
+      write(*, *) 'print_interval      = ', print_interval
       write(*, *) '========================================================='
->>>>>>> d6743305aacfa3051b6ab0a51033b03804347848
 
   end subroutine print_namelist
 
