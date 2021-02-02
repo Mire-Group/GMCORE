@@ -59,7 +59,7 @@ contains
     !call debug_check_areas()
     call process_init()
     call vert_coord_init(num_lev, namelist_path)
-    call process_create_blocks()
+    call process_create_blocks(member_num)
     call pa_init(proc%comm);
     call time_init()
     call history_init(member_num)

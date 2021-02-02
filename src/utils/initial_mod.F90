@@ -20,8 +20,9 @@ module initial_mod
 contains
 
   subroutine initial_write(initial_file_)
-
+    
     character(*), intent(in) :: initial_file_
+
 
     character(4) cell_dims(4), cell_dims_2d(3)
     character(4) lon_dims(4)
@@ -34,82 +35,75 @@ contains
     character*256 filename
 
     filename = initial_file_
-    length = len_trim(initial_file_)
 
        cell_dims(1) =  'lon';     cell_dims(2) =  'lat';     cell_dims(3) =  'lev';     cell_dims(4) = 'time'
         lon_dims(1) = 'ilon';      lon_dims(2) =  'lat';      lon_dims(3) =  'lev';      lon_dims(4) = 'time'
         lat_dims(1) =  'lon';      lat_dims(2) = 'ilat';      lat_dims(3) =  'lev';      lat_dims(4) = 'time'
     cell_dims_2d(1) =  'lon';  cell_dims_2d(2) =  'lat';  cell_dims_2d(3) = 'time'
+     
+    im = 1
 
-    do im = 1 , member_num
+    call fiona_create_dataset('i0', file_path=filename, start_time='1970-01-01', time_units='hours', mpi_comm=proc%comm)
+    call fiona_add_dim('i0', 'time', add_var=.true.)
+    call fiona_add_dim('i0', 'lon'  , size=global_mesh%num_full_lon, add_var=.true., decomp=.true.)
+    call fiona_add_dim('i0', 'lat'  , size=global_mesh%num_full_lat, add_var=.true., decomp=.true.)
+    call fiona_add_dim('i0', 'ilon' , size=global_mesh%num_half_lon, add_var=.true., decomp=.true.)
+    call fiona_add_dim('i0', 'ilat' , size=global_mesh%num_half_lat, add_var=.true., decomp=.true.)
+    if (baroclinic) then
+      call fiona_add_dim('i0', 'lev'  , size=global_mesh%num_full_lev, add_var=.true., decomp=.false.)
+      call fiona_add_dim('i0', 'ilev' , size=global_mesh%num_half_lev, add_var=.true., decomp=.false.)
+      call fiona_add_var('i0', 'pt'   , long_name='potential temperature'       , units='K'      , dim_names=cell_dims)
+      call fiona_add_var('i0', 'phs'  , long_name='surface hydrostatic pressure', units='Pa'     , dim_names=cell_dims_2d)
+      call fiona_add_var('i0', 'u'    , long_name='u wind component'            , units='m s-1'  , dim_names=lon_dims)
+      call fiona_add_var('i0', 'v'    , long_name='v wind component'            , units='m s-1'  , dim_names=lat_dims)
+    end if
+    call fiona_add_var('i0', 'zs', long_name='surface height', units='m' , dim_names=cell_dims_2d)
 
-      
-      write(s_id,"(i2.2)") im
-      filename(length-4 : length - 3) = s_id(1:2)
+    call fiona_start_output('i0', 0.0d0)
+    call fiona_output('i0', 'lon' , global_mesh%full_lon_deg(1:global_mesh%num_full_lon))
+    call fiona_output('i0', 'lat' , global_mesh%full_lat_deg(1:global_mesh%num_full_lat))
+    call fiona_output('i0', 'ilon', global_mesh%half_lon_deg(1:global_mesh%num_half_lon))
+    call fiona_output('i0', 'ilat', global_mesh%half_lat_deg(1:global_mesh%num_half_lat))
+    if (baroclinic) then
+      call fiona_output('i0', 'lev' , global_mesh%full_lev)
+      call fiona_output('i0', 'ilev', global_mesh%half_lev)
+    end if
 
-      call fiona_create_dataset('i0', file_path=filename, start_time='1970-01-01', time_units='hours', mpi_comm=proc%comm)
-      call fiona_add_dim('i0', 'time', add_var=.true.)
-      call fiona_add_dim('i0', 'lon'  , size=global_mesh%num_full_lon, add_var=.true., decomp=.true.)
-      call fiona_add_dim('i0', 'lat'  , size=global_mesh%num_full_lat, add_var=.true., decomp=.true.)
-      call fiona_add_dim('i0', 'ilon' , size=global_mesh%num_half_lon, add_var=.true., decomp=.true.)
-      call fiona_add_dim('i0', 'ilat' , size=global_mesh%num_half_lat, add_var=.true., decomp=.true.)
-      if (baroclinic) then
-        call fiona_add_dim('i0', 'lev'  , size=global_mesh%num_full_lev, add_var=.true., decomp=.false.)
-        call fiona_add_dim('i0', 'ilev' , size=global_mesh%num_half_lev, add_var=.true., decomp=.false.)
-        call fiona_add_var('i0', 'pt'   , long_name='potential temperature'       , units='K'      , dim_names=cell_dims)
-        call fiona_add_var('i0', 'phs'  , long_name='surface hydrostatic pressure', units='Pa'     , dim_names=cell_dims_2d)
-        call fiona_add_var('i0', 'u'    , long_name='u wind component'            , units='m s-1'  , dim_names=lon_dims)
-        call fiona_add_var('i0', 'v'    , long_name='v wind component'            , units='m s-1'  , dim_names=lat_dims)
-      end if
-      call fiona_add_var('i0', 'zs', long_name='surface height', units='m' , dim_names=cell_dims_2d)
+    do iblk = 1, size(proc%blocks)
+      associate (mesh   => proc%blocks(iblk)%mesh,     &
+                state  => proc%blocks(iblk)%state(1), &
+                static => proc%blocks(iblk)%static)
+        is = mesh%full_lon_ibeg; ie = mesh%full_lon_iend
+        js = mesh%full_lat_ibeg; je = mesh%full_lat_iend
+        ks = mesh%full_lev_ibeg; ke = mesh%full_lev_iend
+        start = [is,js,ks]
+        count = [mesh%num_full_lon,mesh%num_full_lat,mesh%num_full_lev]
 
-      call fiona_start_output('i0', 0.0d0)
-      call fiona_output('i0', 'lon' , global_mesh%full_lon_deg(1:global_mesh%num_full_lon))
-      call fiona_output('i0', 'lat' , global_mesh%full_lat_deg(1:global_mesh%num_full_lat))
-      call fiona_output('i0', 'ilon', global_mesh%half_lon_deg(1:global_mesh%num_half_lon))
-      call fiona_output('i0', 'ilat', global_mesh%half_lat_deg(1:global_mesh%num_half_lat))
-      if (baroclinic) then
-        call fiona_output('i0', 'lev' , global_mesh%full_lev)
-        call fiona_output('i0', 'ilev', global_mesh%half_lev)
-      end if
+        if (baroclinic) then
+          call fiona_output('i0', 'pt' , state%pt (im,is:ie,js:je,ks:ke), start=start, count=count)
+          call fiona_output('i0', 'phs', state%phs(im,is:ie,js:je      ), start=start, count=count)
+        end if
+        call fiona_output('i0', 'zs' , static%gzs(im,is:ie,js:je) / g, start=start, count=count)
 
-      do iblk = 1, size(proc%blocks)
-        associate (mesh   => proc%blocks(iblk)%mesh,     &
-                  state  => proc%blocks(iblk)%state(1), &
-                  static => proc%blocks(iblk)%static)
-          is = mesh%full_lon_ibeg; ie = mesh%full_lon_iend
-          js = mesh%full_lat_ibeg; je = mesh%full_lat_iend
-          ks = mesh%full_lev_ibeg; ke = mesh%full_lev_iend
-          start = [is,js,ks]
-          count = [mesh%num_full_lon,mesh%num_full_lat,mesh%num_full_lev]
+        is = mesh%half_lon_ibeg; ie = mesh%half_lon_iend
+        js = mesh%full_lat_ibeg; je = mesh%full_lat_iend
+        ks = mesh%full_lev_ibeg; ke = mesh%full_lev_iend
+        start = [is,js,ks]
+        count = [mesh%num_half_lon,mesh%num_full_lat,mesh%num_full_lev]
 
-          if (baroclinic) then
-            call fiona_output('i0', 'pt' , state%pt (im,is:ie,js:je,ks:ke), start=start, count=count)
-            call fiona_output('i0', 'phs', state%phs(im,is:ie,js:je      ), start=start, count=count)
-          end if
-          call fiona_output('i0', 'zs' , static%gzs(im,is:ie,js:je) / g, start=start, count=count)
+        call fiona_output('i0', 'u', state%u(im,is:ie,js:je,ks:ke), start=start, count=count)
 
-          is = mesh%half_lon_ibeg; ie = mesh%half_lon_iend
-          js = mesh%full_lat_ibeg; je = mesh%full_lat_iend
-          ks = mesh%full_lev_ibeg; ke = mesh%full_lev_iend
-          start = [is,js,ks]
-          count = [mesh%num_half_lon,mesh%num_full_lat,mesh%num_full_lev]
+        is = mesh%full_lon_ibeg; ie = mesh%full_lon_iend
+        js = mesh%half_lat_ibeg; je = mesh%half_lat_iend
+        ks = mesh%full_lev_ibeg; ke = mesh%full_lev_iend
+        start = [is,js,ks]
+        count = [mesh%num_full_lon,mesh%num_half_lat,mesh%num_full_lev]
 
-          call fiona_output('i0', 'u', state%u(im,is:ie,js:je,ks:ke), start=start, count=count)
+        call fiona_output('i0', 'v', state%v(im,is:ie,js:je,ks:ke), start=start, count=count)
+      end associate
+    end do
 
-          is = mesh%full_lon_ibeg; ie = mesh%full_lon_iend
-          js = mesh%half_lat_ibeg; je = mesh%half_lat_iend
-          ks = mesh%full_lev_ibeg; ke = mesh%full_lev_iend
-          start = [is,js,ks]
-          count = [mesh%num_full_lon,mesh%num_half_lat,mesh%num_full_lev]
-
-          call fiona_output('i0', 'v', state%v(im,is:ie,js:je,ks:ke), start=start, count=count)
-        end associate
-      end do
-
-      call fiona_end_output('i0')
-
-    end do ! im member_num
+    call fiona_end_output('i0')
 
 
 

@@ -2,10 +2,12 @@
   num_lon             = 360
   num_lat             = 180
   num_lev             = 26
-  topo_file           = '/data/geog/ETOPO1_Ice_g_gmt4.grd'
+  topo_file           = '/share2/Dida/geog/ETOPO1_Ice_g_gmt4.grd'
   bkg_type            = 'era5'
-  bkg_file            = './era5_2020121200.nc'
+  bkg_file            = '/share2/Dida/inifile/mpas/20190601/MPAS_360x180_2019-06-02_00.00.00.nc'
   vert_coord_scheme   = 'hybrid'
   vert_coord_template = 'test_l26'
   initial_file        = 'test.nc'
+  member_num          = 1
+  initial_interval    = 6
 /

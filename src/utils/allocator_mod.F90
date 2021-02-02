@@ -262,8 +262,6 @@ contains
     logical        , intent(in ), optional    :: full_lev
     logical        , intent(in ), optional    :: half_lev
 
-    !write(*,*) , "I'm in!!!"
-
     if (present(full_lon) .and. present(full_lat) .and. present(full_lev)) then
       if (full_lon .and. full_lat .and. full_lev) allocate(array(member,mesh%full_lon_lb:mesh%full_lon_ub,mesh%full_lat_lb:mesh%full_lat_ub,mesh%full_lev_lb:mesh%full_lev_ub))
     else if (present(full_lon) .and. present(half_lat) .and. present(full_lev)) then

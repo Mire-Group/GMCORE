@@ -258,13 +258,14 @@ contains
 
   end subroutine setup_zonal_comm_for_reduce
 
-  subroutine process_create_blocks()
-
+  subroutine process_create_blocks(para_member_num)
+    
+    integer, intent(in) :: para_member_num
     integer i, j, dtype
 
     if (.not. allocated(proc%blocks)) allocate(proc%blocks(1))
 
-    call proc%blocks(1)%init(proc%id, member_num , global_mesh%lon_halo_width, global_mesh%lat_halo_width, &
+    call proc%blocks(1)%init(proc%id, para_member_num , global_mesh%lon_halo_width, global_mesh%lat_halo_width, &
                              proc%lon_ibeg, proc%lon_iend, proc%lat_ibeg, proc%lat_iend)
 
     

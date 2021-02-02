@@ -46,8 +46,8 @@ module namelist_mod
   character(30) :: split_scheme = ''
   character(30) :: time_scheme = 'pc2'
 
-  real(r8) :: coarse_polar_lat0 = 0
-  real(r8) :: coarse_polar_decay = 0.2
+  real(r8) :: coarse_pole_mul      = 0
+  real(r8) :: coarse_pole_decay    = 100.0
 
   ! Reduce settings
   integer :: reduce_factors(100) = 0
@@ -123,8 +123,8 @@ module namelist_mod
     split_scheme              , &
     time_scheme               , &
     fast_cycles               , &
-    coarse_polar_lat0         , &
-    coarse_polar_decay        , &
+    coarse_pole_mul           , &
+    coarse_pole_decay         , &
     reduce_factors            , &
     reduce_pv_directly        , &
     do_reduce_ke              , &
@@ -176,6 +176,10 @@ contains
     write(*, *) 'num_lev             = ', to_str(num_lev)
     write(*, *) 'num_proc_lon        = ', to_str(num_proc_lon)
     write(*, *) 'num_proc_lat        = ', to_str(num_proc_lat)
+    if (coarse_pole_mul /= 0) then
+      write(*, *) 'coarse_pole_mul     = ', to_str(coarse_pole_mul, 3)
+      write(*, *) 'coarse_pole_decay   = ', to_str(coarse_pole_decay, 3)
+    end if
     write(*, *) 'vert_coord_scheme   = ', trim(vert_coord_scheme)
     write(*, *) 'vert_coord_template = ', trim(vert_coord_template)
     write(*, *) 'dt_in_seconds       = ', to_str(int(dt_in_seconds))
