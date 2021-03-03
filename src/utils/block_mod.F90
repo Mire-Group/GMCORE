@@ -78,7 +78,7 @@ contains
       select case (trim(time_scheme))
       case ('pc2', 'rk2','euler')
         allocate(this%state(3))
-        allocate(this%tend (3))
+        allocate(this%tend (1)) ! try only 1 tend
       case ('rk3', 'ssprk3')
         allocate(this%state(4))
         allocate(this%tend (4))
