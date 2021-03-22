@@ -96,6 +96,10 @@ module namelist_mod
   real(r8)        :: nest_lat_beg(20)     = inf
   real(r8)        :: nest_lat_end(20)     = inf
 
+  !muti prepare
+  integer         :: file_num = 1
+  integer         :: initial_interval = 0
+
   namelist /gmcore_control/     &
     case_name                 , &
     test_case                 , &
@@ -170,7 +174,9 @@ module namelist_mod
     nest_lon_beg              , &
     nest_lon_end              , &
     nest_lat_beg              , &
-    nest_lat_end
+    nest_lat_end              , &
+    file_num                  , &
+    initial_interval       
 
 contains
 

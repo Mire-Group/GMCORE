@@ -10,6 +10,7 @@ program gmcore_prepare
   use vert_coord_mod
   use initial_mod
   use namelist_mod
+  use file_date_mod
 
   implicit none
 
@@ -29,7 +30,10 @@ program gmcore_prepare
   real(r8) :: smth_max_lat(100) = -1.0e33
   integer :: smth_steps(100) = 1
 
-  integer iblk, i
+  integer iblk, i , iter_file
+  integer ini_minute , ini_hour , ini_day , ini_month , ini_year
+  integer mpas_len , gmcore_len
+  character(30) :: s_id
 
   namelist /gmcore_prepare_params/ &
     initial_time                 , &
@@ -52,7 +56,9 @@ program gmcore_prepare
     smth_max_lon                 , &
     smth_min_lat                 , &
     smth_max_lat                 , &
-    smth_steps
+    smth_steps                   , &
+    file_num                     , &
+    initial_interval 
 
   call get_command_argument(1, namelist_file)
 
@@ -76,6 +82,10 @@ program gmcore_prepare
   write(*, *) 'bkg_file             = ', trim(bkg_file)
   write(*, *) 'initial_file         = ', trim(initial_file)
   write(*, *) 'bkg_type             = ', trim(bkg_type)
+  write(*, *) 'file_num            = ', to_str(file_num)
+  if (file_num > 1) then
+    write(*, *) 'initial_interval    = ', to_str(initial_interval)
+  end if
   write(*, *) '========================================================='
 
   time_scheme = 'N/A'
@@ -105,15 +115,57 @@ program gmcore_prepare
     end do
   end do
 
-  call bkg_read(bkg_type, bkg_file)
+  mpas_len = len_trim(bkg_file)
+  gmcore_len = len_trim(initial_file)
+  read(bkg_file(mpas_len - 21 : mpas_len - 18) , *) ini_year
+  read(bkg_file(mpas_len - 16 : mpas_len - 15) , *) ini_month
+  read(bkg_file(mpas_len - 13 : mpas_len - 12) , *) ini_day
+  read(bkg_file(mpas_len - 10 : mpas_len -  9) , *) ini_hour
+  read(bkg_file(mpas_len -  7 : mpas_len -  6) , *) ini_minute
 
-  call bkg_regrid_phs()
-  call bkg_calc_ph()
-  call bkg_regrid_pt()
-  call bkg_regrid_u()
-  call bkg_regrid_v()
+  do iter_file = 1 , file_num
 
-  call initial_write(initial_file)
+    initial_file(gmcore_len - 21 : gmcore_len - 18) = bkg_file(mpas_len - 21 : mpas_len - 18)
+    initial_file(gmcore_len - 16 : gmcore_len - 15) = bkg_file(mpas_len - 16 : mpas_len - 15)
+    initial_file(gmcore_len - 13 : gmcore_len - 12) = bkg_file(mpas_len - 13 : mpas_len - 12)
+    initial_file(gmcore_len - 10 : gmcore_len - 9 ) = bkg_file(mpas_len - 10 : mpas_len - 9 )
+    initial_file(gmcore_len - 7  : gmcore_len - 6 ) = bkg_file(mpas_len - 7  : mpas_len - 6 )
+
+    call bkg_read(bkg_type, bkg_file)
+
+    call bkg_regrid_phs()
+    call bkg_calc_ph()
+    call bkg_regrid_pt()
+    call bkg_regrid_u()
+    call bkg_regrid_v()
+
+    call initial_write(initial_file)
+
+    call date_advance(ini_year , ini_month , ini_day , ini_hour , ini_minute)
+
+    write(s_id,"(i4.4)") ini_year
+    bkg_file(mpas_len - 21 : mpas_len - 18) = s_id
+    s_id = 'N/A'
+
+    write(s_id,"(i2.2)") ini_month
+    bkg_file(mpas_len - 16 : mpas_len - 15) = s_id
+    s_id = 'N/A'
+    
+    write(s_id,"(i2.2)") ini_day
+    bkg_file(mpas_len - 13 : mpas_len - 12) = s_id
+    s_id = 'N/A'
+
+    write(s_id,"(i2.2)") ini_hour
+    bkg_file(mpas_len - 10 : mpas_len - 9)  = s_id
+    s_id = 'N/A'
+
+    write(s_id,"(i2.2)") ini_minute
+    bkg_file(mpas_len - 7  : mpas_len - 6)  = s_id
+    s_id = 'N/A'
+
+
+
+  end do
 
   call topo_final()
   call bkg_final()

@@ -104,6 +104,7 @@ set(gmcore_files
   src/utils/initial_mod.F90
   src/utils/restart_mod.F90
   src/utils/time_mod.F90
+  src/utils/file_date_mod.F90
   src/utils/sphere_geometry_mod.F90
   src/utils/block_mod.F90
   src/utils/process_mod.F90
